@@ -1,0 +1,284 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Investor {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  name        String
+  status      String    @default("ACTIVE") // ACTIVE, INACTIVE
+  contactInfo String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  projects    Project[]
+}
+
+model Project {
+  id                  String        @id @default(uuid())
+  investorId          String
+  investor            Investor      @relation(fields: [investorId], references: [id])
+  code                String        @unique
+  name                String
+  location            String
+  status              String        @default("UPCOMING") // UPCOMING, SELLING, COMPLETED, CLOSED
+  lockDurationMinutes Int           @default(30)
+  saleOpenAt          DateTime?
+  saleCloseAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  products            Product[]
+  paymentPlans        PaymentPlan[]
+}
+
+model ProductType {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  name           String    // Căn hộ, Shophouse, Biệt thự, Duplex, Penthouse
+  metadataSchema String?   // JSON configuration for extra fields
+  products       Product[]
+}
+
+model PaymentPlan {
+  id           String         @id @default(uuid())
+  projectId    String
+  project      Project        @relation(fields: [projectId], references: [id])
+  code         String
+  name         String         // Thanh toán chuẩn, Thanh toán sớm 95%, Vay ngân hàng 70%
+  scheduleJson String?        // JSON of installments schedule
+  active       Boolean        @default(true)
+  prices       ProductPrice[]
+  contracts    Contract[]
+}
+
+model Product {
+  id            String                 @id @default(uuid())
+  projectId     String
+  project       Project                @relation(fields: [projectId], references: [id])
+  productTypeId String
+  productType   ProductType            @relation(fields: [productTypeId], references: [id])
+  productCode   String                 // e.g., A-1001, B-0502
+  building      String                 // Tòa A, Tòa B
+  floor         Int
+  area          Float                  // m2
+  direction     String                 // Đông Nam, Tây Bắc, etc.
+  handoverPlan  String                 // Bàn giao thô, Bàn giao hoàn thiện
+  status        String                 @default("AVAILABLE") // AVAILABLE, LOCKED, DEPOSITED, SOLD, UNAVAILABLE
+  version       Int                    @default(1)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  prices        ProductPrice[]
+  locks         ProductLock[]
+  contracts     Contract[]
+  history       ProductStatusHistory[]
+
+  @@unique([projectId, productCode])
+}
+
+model ProductPrice {
+  id            String      @id @default(uuid())
+  productId     String
+  product       Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  paymentPlanId String
+  paymentPlan   PaymentPlan @relation(fields: [paymentPlanId], references: [id])
+  amount        Float       // Total price in VND
+  depositAmount Float       // Deposit amount in VND
+  validFrom     DateTime    @default(now())
+  validTo       DateTime?
+  version       Int         @default(1)
+}
+
+model Department {
+  id        String     @id @default(uuid())
+  code      String     @unique
+  name      String
+  parentId  String?
+  employees Employee[]
+}
+
+model Employee {
+  id                     String                 @id @default(uuid())
+  employeeCode           String                 @unique
+  fullName               String
+  phone                  String
+  email                  String                 @unique
+  departmentId           String
+  department             Department             @relation(fields: [departmentId], references: [id])
+  jobTitle               String                 // Sales, Product Admin, Sales Admin, Manager
+  status                 String                 @default("ACTIVE")
+  locks                  ProductLock[]
+  contracts              Contract[]
+  customerVerifications1 CustomerVerification[] @relation("SubmittedBy")
+  customerVerifications2 CustomerVerification[] @relation("ReviewedBy")
+  contractReviews        ContractReview[]
+}
+
+model ProductLock {
+  id                 String               @id @default(uuid())
+  productId          String
+  product            Product              @relation(fields: [productId], references: [id])
+  salesEmployeeId    String
+  salesEmployee      Employee             @relation(fields: [salesEmployeeId], references: [id])
+  status             String               @default("ACTIVE") // ACTIVE, PAYMENT_PENDING, DEPOSIT_CONFIRMED, EXPIRED, CANCELLED
+  startedAt          DateTime             @default(now())
+  expiresAt          DateTime
+  depositConfirmedAt DateTime?
+  cancelReason       String?
+  idempotencyKey     String?              @unique
+  version            Int                  @default(1)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  payments           PaymentTransaction[]
+  contracts          Contract[]
+}
+
+model PaymentTransaction {
+  id                String       @id @default(uuid())
+  lockId            String
+  lock              ProductLock  @relation(fields: [lockId], references: [id])
+  provider          String       @default("VIETQR_AHS")
+  providerReference String       @unique
+  amount            Float
+  currency          String       @default("VND")
+  status            String       @default("PENDING") // PENDING, SUCCEEDED, FAILED, EXPIRED, REVIEW_REQUIRED
+  qrPayload         String?
+  expiresAt         DateTime
+  paidAt            DateTime?
+  rawSummary        String?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+}
+
+model PaymentWebhookEvent {
+  id               String   @id @default(uuid())
+  provider         String
+  providerEventId  String   @unique
+  signatureValid   Boolean  @default(true)
+  payloadEncrypted String
+  receivedAt       DateTime @default(now())
+  processedAt      DateTime?
+  processingStatus String   @default("PROCESSED")
+
+  @@unique([provider, providerEventId])
+}
+
+model Customer {
+  id                 String                 @id @default(uuid())
+  fullName           String
+  phone              String
+  email              String
+  cccdCiphertext     String                 // Encrypted or stored safely
+  cccdHash           String                 // For duplicate detection
+  addressCiphertext  String
+  verificationStatus String                 @default("DRAFT") // DRAFT, PENDING_VERIFICATION, VERIFIED, CHANGE_REQUESTED, REJECTED
+  version            Int                    @default(1)
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  verifications      CustomerVerification[]
+  contracts          Contract[]
+}
+
+model CustomerVerification {
+  id              String   @id @default(uuid())
+  customerId      String
+  customer        Customer @relation(fields: [customerId], references: [id])
+  submittedById   String
+  submittedBy     Employee @relation("SubmittedBy", fields: [submittedById], references: [id])
+  reviewedById    String?
+  reviewedBy      Employee?@relation("ReviewedBy", fields: [reviewedById], references: [id])
+  status          String   @default("PENDING") // PENDING, APPROVED, CHANGE_REQUESTED, REJECTED
+  fieldIssuesJson String?  // JSON array of issues
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Contract {
+  id              String           @id @default(uuid())
+  contractNumber  String           @unique
+  productId       String
+  product         Product          @relation(fields: [productId], references: [id])
+  customerId      String
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  lockId          String?
+  lock            ProductLock?     @relation(fields: [lockId], references: [id])
+  salesEmployeeId String
+  salesEmployee   Employee         @relation(fields: [salesEmployeeId], references: [id])
+  paymentPlanId   String
+  paymentPlan     PaymentPlan      @relation(fields: [paymentPlanId], references: [id])
+  agreedPrice     Float
+  status          String           @default("DRAFT") // DRAFT, PENDING_REVIEW, CHANGE_REQUESTED, APPROVED, REJECTED, SIGNED, CANCELLED
+  snapshotJson    String?          // Full snapshot of prices, customer, product state
+  signedAt        DateTime?
+  version         Int              @default(1)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  reviews         ContractReview[]
+}
+
+model ContractReview {
+  id              String   @id @default(uuid())
+  contractId      String
+  contract        Contract @relation(fields: [contractId], references: [id])
+  reviewerId      String
+  reviewer        Employee @relation(fields: [reviewerId], references: [id])
+  decision        String   // APPROVED, CHANGE_REQUESTED, REJECTED
+  reason          String?
+  fieldIssuesJson String?
+  createdAt       DateTime @default(now())
+}
+
+model FileAttachment {
+  id         String   @id @default(uuid())
+  ownerType  String   // CONTRACT, CUSTOMER, PRODUCT, REPORT
+  ownerId    String
+  objectKey  String
+  fileName   String
+  mimeType   String
+  size       Int
+  checksum   String?
+  scanStatus String   @default("CLEAN")
+  uploadedBy String
+  createdAt  DateTime @default(now())
+}
+
+model ProductStatusHistory {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id])
+  fromStatus String
+  toStatus   String
+  reason     String?
+  actorId    String
+  occurredAt DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actorName  String
+  action     String   // e.g. LOCK_PRODUCT, APPROVE_CONTRACT, VIEW_PII
+  entityType String
+  entityId   String
+  beforeJson String?
+  afterJson  String?
+  requestId  String?
+  ip         String?
+  createdAt  DateTime @default(now())
+}
+
+model ReportExport {
+  id          String    @id @default(uuid())
+  reportType  String    // REVENUE, INVENTORY, SALES_PERFORMANCE
+  filtersJson String
+  status      String    @default("QUEUED") // QUEUED, RUNNING, COMPLETED, FAILED
+  requestedBy String
+  objectKey   String?
+  expiresAt   DateTime?
+  errorCode   String?
+  createdAt   DateTime  @default(now())
+}
