@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sweepExpiredLocks } from '@/lib/locks';
+import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
 export async function GET(request: Request) {
   try {
+    await ensureDatabaseSeeded();
     // Sweep any expired locks before returning results
     await sweepExpiredLocks();
 

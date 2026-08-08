@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
 export async function GET() {
   try {
+    await ensureDatabaseSeeded();
+
     const projects = await db.project.findMany({
       include: {
         investor: true,
