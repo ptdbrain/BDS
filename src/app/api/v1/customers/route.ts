@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
 function maskCCCD(cccd: string) {
   if (!cccd || cccd.length < 4) return '********';
@@ -14,6 +15,7 @@ function maskPhone(phone: string) {
 
 export async function GET(request: Request) {
   try {
+    await ensureDatabaseSeeded();
     const { searchParams } = new URL(request.url);
     const revealPII = searchParams.get('revealPII') === 'true';
     const actorId = searchParams.get('actorId') || 'UNKNOWN';

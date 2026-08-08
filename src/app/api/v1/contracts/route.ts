@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
 export async function GET() {
   try {
+    await ensureDatabaseSeeded();
     const contracts = await db.contract.findMany({
       include: {
         product: { include: { project: true } },

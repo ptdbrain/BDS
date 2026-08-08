@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { acquireProductLock, sweepExpiredLocks } from '@/lib/locks';
+import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
 export async function GET() {
   try {
+    await ensureDatabaseSeeded();
     await sweepExpiredLocks();
 
     const locks = await db.productLock.findMany({

@@ -4,7 +4,14 @@ let isSeeding = false;
 
 export async function ensureDatabaseSeeded() {
   try {
-    const productCount = await db.product.count();
+    let productCount = 0;
+    try {
+      productCount = await db.product.count();
+    } catch (tableErr: any) {
+      console.warn('[SeedHelper] Database table missing or uninitialized:', tableErr?.message || tableErr);
+      return;
+    }
+
     if (productCount > 0) {
       return;
     }
@@ -12,7 +19,7 @@ export async function ensureDatabaseSeeded() {
     if (isSeeding) return;
     isSeeding = true;
 
-    console.log('Database empty on serverless environment. Auto-seeding initial dataset...');
+    console.log('[SeedHelper] Database empty on serverless environment. Auto-seeding initial dataset...');
 
     // 1. Departments & Employees
     const deptSales = await db.department.create({
@@ -214,9 +221,9 @@ export async function ensureDatabaseSeeded() {
       });
     }
 
-    console.log(`Auto-seeded ${createdProducts.length} real estate units successfully.`);
+    console.log(`[SeedHelper] Auto-seeded ${createdProducts.length} real estate units successfully.`);
   } catch (err) {
-    console.error('Error during auto-seeding:', err);
+    console.error('[SeedHelper] Error during auto-seeding:', err);
   } finally {
     isSeeding = false;
   }
