@@ -42,7 +42,7 @@ export async function POST(request: Request) {
 
     const product = await db.product.findUnique({
       where: { id: productId },
-      include: { project: true }
+      include: { project: true, prices: true }
     });
 
     const customer = await db.customer.findUnique({
@@ -53,7 +53,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc khách hàng' }, { status: 400 });
     }
 
-    // Generate contract number
+    if (product.status === 'SOLD') {
+      return NextResponse.json({
+        type: 'urn:ahs:problem:product-already-sold',
+        title: 'Sản phẩm đã bán',
+        status: 400,
+        code: 'PRODUCT_ALREADY_SOLD',
+        detail: 'Sản phẩm này đã được bán thành công cho khách hàng khác.'
+      }, { status: 400 });
+    }
+
+    // Resolve accurate agreed price from product price list if not provided
+    const resolvedPrice = agreedPrice || product.prices[0]?.amount || 4500000000;
+
+    // Generate formal contract number
     const year = new Date().getFullYear();
     const rand = Math.floor(Math.random() * 8999 + 1000);
     const contractNumber = `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
@@ -65,7 +78,7 @@ export async function POST(request: Request) {
       area: product.area,
       customerName: customer.fullName,
       customerPhone: customer.phone,
-      agreedPrice: agreedPrice || 4500000000,
+      agreedPrice: resolvedPrice,
       createdAt: new Date().toISOString()
     };
 
@@ -77,7 +90,7 @@ export async function POST(request: Request) {
         lockId,
         salesEmployeeId,
         paymentPlanId,
-        agreedPrice: agreedPrice || 4500000000,
+        agreedPrice: resolvedPrice,
         status: 'PENDING_REVIEW',
         snapshotJson: JSON.stringify(snapshot)
       }

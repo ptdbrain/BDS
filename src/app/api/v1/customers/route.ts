@@ -2,15 +2,25 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
+import { encryptPII, decryptPII, hashPII } from '@/lib/security';
 
 function maskCCCD(cccd: string) {
   if (!cccd || cccd.length < 4) return '********';
-  return '********' + cccd.slice(-4);
+  const plain = decryptPII(cccd);
+  if (!plain || plain.length < 4) return '********';
+  return '********' + plain.slice(-4);
 }
 
 function maskPhone(phone: string) {
   if (!phone || phone.length < 4) return '09******';
   return phone.slice(0, 3) + '****' + phone.slice(-3);
+}
+
+function maskAddress(address: string) {
+  if (!address) return 'Hà Nội';
+  const plain = decryptPII(address);
+  const parts = plain.split(',');
+  return parts.pop()?.trim() || 'Hà Nội';
 }
 
 export async function GET(request: Request) {
@@ -19,6 +29,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const revealPII = searchParams.get('revealPII') === 'true';
     const actorId = searchParams.get('actorId') || 'UNKNOWN';
+    const actorName = searchParams.get('actorName') || 'Nguoi dung he thong';
 
     const customers = await db.customer.findMany({
       include: {
@@ -31,19 +42,32 @@ export async function GET(request: Request) {
     if (revealPII && actorId !== 'UNKNOWN') {
       await createAuditLog({
         actorId,
-        actorName: 'User requested PII unmasking',
+        actorName,
         action: 'VIEW_UNMASKED_CUSTOMER_PII',
         entityType: 'CUSTOMER_LIST',
         entityId: 'ALL'
       });
     }
 
-    const processed = customers.map(c => ({
-      ...c,
-      cccdDisplay: revealPII ? c.cccdCiphertext : maskCCCD(c.cccdCiphertext),
-      phoneDisplay: revealPII ? c.phone : maskPhone(c.phone),
-      addressDisplay: revealPII ? c.addressCiphertext : (c.addressCiphertext.split(',').pop()?.trim() || 'Hà Nội')
-    }));
+    const processed = customers.map(c => {
+      const plainCCCD = decryptPII(c.cccdCiphertext);
+      const plainAddress = decryptPII(c.addressCiphertext);
+
+      return {
+        id: c.id,
+        fullName: c.fullName,
+        phone: c.phone,
+        email: c.email,
+        verificationStatus: c.verificationStatus,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        verifications: c.verifications,
+        contracts: c.contracts,
+        cccdDisplay: revealPII ? plainCCCD : maskCCCD(c.cccdCiphertext),
+        phoneDisplay: revealPII ? c.phone : maskPhone(c.phone),
+        addressDisplay: revealPII ? plainAddress : maskAddress(c.addressCiphertext)
+      };
+    });
 
     return NextResponse.json({ data: processed });
   } catch (error: any) {
@@ -69,9 +93,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Họ tên, SĐT và CCCD là bắt buộc' }, { status: 400 });
     }
 
-    const cccdHash = `hash_${cccd.trim()}`;
+    // Precondition Validation: Customer must be associated with an active lock or deposit transaction
+    if (lockId) {
+      const lock = await db.productLock.findUnique({
+        where: { id: lockId }
+      });
+      if (!lock) {
+        return NextResponse.json({
+          type: 'urn:ahs:problem:lock-not-found',
+          title: 'Không tìm thấy giao dịch giữ căn',
+          status: 400,
+          code: 'LOCK_NOT_FOUND',
+          detail: 'Thông tin khách hàng phải gắn liền với một giao dịch giữ căn/cọc hợp lệ.'
+        }, { status: 400 });
+      }
+    }
 
-    // Duplicate detection check
+    const cccdHash = hashPII(cccd.trim());
+    const cccdCiphertext = encryptPII(cccd.trim());
+    const addressCiphertext = encryptPII(address?.trim() || 'Hà Nội');
+
+    // Duplicate detection check via hash
     const existing = await db.customer.findFirst({
       where: {
         OR: [{ cccdHash }, { phone: phone.trim() }]
@@ -88,9 +130,9 @@ export async function POST(request: Request) {
           fullName: fullName.trim(),
           phone: phone.trim(),
           email: email?.trim() || '',
-          cccdCiphertext: cccd.trim(),
+          cccdCiphertext,
           cccdHash,
-          addressCiphertext: address?.trim() || 'Hà Nội',
+          addressCiphertext,
           verificationStatus: 'DRAFT'
         }
       });
@@ -105,13 +147,13 @@ export async function POST(request: Request) {
       });
     }
 
-    // Automatically trigger CustomerVerification creation if linked to a Lock
+    // Automatically trigger CustomerVerification creation
     const verification = await db.customerVerification.create({
       data: {
         customerId: customer.id,
         submittedById: actorId,
         status: 'PENDING',
-        notes: lockId ? `Khách hàng gắn với giao dịch cọc lockId: ${lockId}` : 'Khai báo thông tin mới'
+        notes: lockId ? `Khai báo thông tin khách gắn với giao dịch cọc lockId: ${lockId}` : 'Khai báo thông tin khách mới'
       }
     });
 
@@ -122,7 +164,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       data: {
-        customer,
+        customer: {
+          ...customer,
+          cccdDisplay: maskCCCD(customer.cccdCiphertext),
+          phoneDisplay: maskPhone(customer.phone)
+        },
         verification,
         isDuplicateFound: !!existing
       }

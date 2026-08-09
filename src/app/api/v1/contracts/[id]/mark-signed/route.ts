@@ -19,6 +19,17 @@ export async function POST(
       return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
     }
 
+    // Strict Business Guard: Contract must be APPROVED before signing & turning product to SOLD
+    if (contract.status !== 'APPROVED') {
+      return NextResponse.json({
+        type: 'urn:ahs:problem:contract-not-approved',
+        title: 'Hợp đồng chưa được phê duyệt',
+        status: 400,
+        code: 'CONTRACT_NOT_APPROVED',
+        detail: `Hợp đồng ${contract.contractNumber} hiện ở trạng thái '${contract.status}'. Chỉ hợp đồng ở trạng thái 'APPROVED' mới đủ điều kiện ký kết để chuyển căn thành ĐÃ BÁN.`
+      }, { status: 400 });
+    }
+
     await db.$transaction(async (tx) => {
       // Mark Contract SIGNED
       await tx.contract.update({

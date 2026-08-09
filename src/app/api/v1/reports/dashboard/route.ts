@@ -28,11 +28,11 @@ export async function GET() {
       db.employee.findMany({ include: { _count: { select: { locks: true, contracts: true } } } })
     ]);
 
-    // Calculate revenue
+    // Calculate actual revenue strictly from real database transactions and contracts
     const totalDepositRevenue = succeededPayments.reduce((acc, p) => acc + p.amount, 0);
     const totalContractRevenue = contracts.reduce((acc, c) => acc + c.agreedPrice, 0);
 
-    // Sales Leaderboard
+    // Sales Leaderboard derived strictly from actual contract transactions
     const leaderboard = employees.map(emp => {
       const empContracts = contracts.filter(c => c.salesEmployeeId === emp.id);
       const empRevenue = empContracts.reduce((acc, c) => acc + c.agreedPrice, 0);
@@ -46,7 +46,7 @@ export async function GET() {
       };
     }).sort((a, b) => b.totalRevenue - a.totalRevenue);
 
-    // Revenue by project
+    // Revenue by project strictly calculated from database aggregates
     const projects = await db.project.findMany({
       include: {
         products: {
@@ -61,6 +61,11 @@ export async function GET() {
         return sum + prodContracts.reduce((cSum, c) => cSum + c.agreedPrice, 0);
       }, 0);
 
+      const projDepositRevenue = proj.products.reduce((sum, p) => {
+        const succeeded = p.locks.flatMap(l => l.payments).filter(pay => pay.status === 'SUCCEEDED');
+        return sum + succeeded.reduce((paySum, pay) => paySum + pay.amount, 0);
+      }, 0);
+
       const projDepositCount = proj.products.filter(p => p.status === 'DEPOSITED' || p.status === 'SOLD').length;
 
       return {
@@ -68,7 +73,9 @@ export async function GET() {
         projectName: proj.name,
         totalUnits: proj.products.length,
         depositedUnits: projDepositCount,
-        revenue: projSoldRevenue || projDepositCount * 4500000000
+        depositRevenue: projDepositRevenue,
+        contractRevenue: projSoldRevenue,
+        revenue: projSoldRevenue + projDepositRevenue // Total actual realized revenue
       };
     });
 

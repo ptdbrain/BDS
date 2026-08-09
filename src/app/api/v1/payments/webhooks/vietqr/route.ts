@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { verifyVietQRWebhookSignature } from '@/lib/security';
 
 export async function POST(request: Request) {
   try {
-    const signature = request.headers.get('X-Provider-Signature');
-    const body = await request.json();
+    const rawBody = await request.text();
+    let body: any = {};
+    try {
+      body = JSON.parse(rawBody);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const signature =
+      request.headers.get('X-Provider-Signature') ||
+      request.headers.get('X-VietQR-Signature');
+
+    const isSignatureValid = verifyVietQRWebhookSignature(rawBody, signature);
 
     const {
       eventId = `evt_${Date.now()}`,
@@ -36,13 +48,13 @@ export async function POST(request: Request) {
       }, { status: 200 });
     }
 
-    // Record raw webhook event
+    // Record raw webhook event with signature status
     await db.paymentWebhookEvent.create({
       data: {
         provider: 'VIETQR_AHS',
         providerEventId: eventId,
-        signatureValid: signature ? signature !== 'INVALID' : true,
-        payloadEncrypted: JSON.stringify(body),
+        signatureValid: isSignatureValid,
+        payloadEncrypted: rawBody,
         receivedAt: new Date(),
         processingStatus: 'PROCESSED'
       }
@@ -68,14 +80,20 @@ export async function POST(request: Request) {
     const isExpired = payment.expiresAt < now;
     const isAmountMismatch = Number(amount) !== Number(payment.amount);
 
-    if (isAmountMismatch || isExpired) {
+    if (isAmountMismatch || isExpired || !isSignatureValid) {
+      const reason = !isSignatureValid
+        ? 'Chữ ký Webhook không hợp lệ (Cảnh báo bảo mật)'
+        : isAmountMismatch
+        ? 'Chênh lệch số tiền cọc so với niêm yết'
+        : 'Tiền chuyển đến sau khi đã hết thời gian giữ căn 30 phút';
+
       // Mark payment for manual reconciliation
       await db.paymentTransaction.update({
         where: { id: payment.id },
         data: {
           status: 'REVIEW_REQUIRED',
           paidAt: new Date(paidAt),
-          rawSummary: `Chuyển tiền gặp ngoại lệ: ${isAmountMismatch ? 'Chênh lệch số tiền cọc' : 'Tiền đến sau khi hết 30 phút giữ căn'}`
+          rawSummary: `Chuyển tiền gặp ngoại lệ đối soát: ${reason}`
         }
       });
 
@@ -85,14 +103,14 @@ export async function POST(request: Request) {
         action: 'PAYMENT_RECONCILIATION_REQUIRED',
         entityType: 'PAYMENT_TRANSACTION',
         entityId: payment.id,
-        afterJson: { isExpired, isAmountMismatch, receivedAmount: amount, expectedAmount: payment.amount }
+        afterJson: { isExpired, isAmountMismatch, isSignatureValid, receivedAmount: amount, expectedAmount: payment.amount }
       });
 
       return NextResponse.json({
         status: 'REVIEW_REQUIRED',
-        message: isAmountMismatch ? 'Số tiền thanh toán không khớp với tiền cọc niêm yết' : 'Thanh toán thành công nhưng đã quá 30 phút giữ căn. Cần Sales Admin đối soát.',
+        message: `Giao dịch đã ghi nhận nhưng cần Sales Admin đối soát: ${reason}`,
         data: { paymentId: payment.id }
-      }, { status: 200 }); // Provider receives 200 to prevent infinite retries
+      }, { status: 200 }); // Return 200 to gateway to avoid retry flood
     }
 
     // 3. Normal Success Path

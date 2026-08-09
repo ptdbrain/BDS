@@ -36,7 +36,7 @@ export async function sweepExpiredLocks() {
             productId: lock.productId,
             fromStatus: 'LOCKED',
             toStatus: 'AVAILABLE',
-            reason: 'Lock hết hạn 30 phút tự động giải phóng',
+            reason: 'Lock hết hạn tự động giải phóng bởi Background Sweeper',
             actorId: 'SYSTEM'
           }
         });
@@ -68,7 +68,7 @@ export async function acquireProductLock({
   salesEmployeeName: string;
   idempotencyKey?: string;
 }) {
-  // First sweep any expired locks
+  // Sweep expired locks first
   await sweepExpiredLocks();
 
   // Check idempotency if key provided
@@ -81,106 +81,112 @@ export async function acquireProductLock({
     }
   }
 
-  // Atomically check product status & lock
-  const result = await db.$transaction(async (tx) => {
-    const product = await tx.product.findUnique({
-      where: { id: productId }
-    });
-
-    if (!product) {
-      throw new Error('PRODUCT_NOT_FOUND');
+  // Pre-resolve valid sales employee ID outside transaction
+  let validSalesId = salesEmployeeId;
+  const empExists = await db.employee.findUnique({ where: { id: salesEmployeeId } });
+  if (!empExists) {
+    const defaultEmp = await db.employee.findFirst({ where: { employeeCode: 'NV-SALE-01' } }) || await db.employee.findFirst();
+    if (defaultEmp) {
+      validSalesId = defaultEmp.id;
     }
+  }
 
-    if (product.status !== 'AVAILABLE') {
-      throw new Error('PRODUCT_ALREADY_LOCKED');
-    }
-
-    // Check if active lock exists
-    const activeLock = await tx.productLock.findFirst({
-      where: {
-        productId,
-        status: { in: ['ACTIVE', 'PAYMENT_PENDING'] },
-        expiresAt: { gt: new Date() }
-      }
-    });
-
-    if (activeLock) {
-      throw new Error('PRODUCT_ALREADY_LOCKED');
-    }
-
-    // Lock for 30 minutes
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-
-    // Ensure valid sales employee ID
-    let validSalesId = salesEmployeeId;
-    const empExists = await tx.employee.findUnique({ where: { id: salesEmployeeId } });
-    if (!empExists) {
-      const defaultEmp = await tx.employee.findFirst({ where: { employeeCode: 'NV-SALE-01' } }) || await tx.employee.findFirst();
-      if (defaultEmp) {
-        validSalesId = defaultEmp.id;
-      }
-    }
-
-    const lock = await tx.productLock.create({
-      data: {
-        productId,
-        salesEmployeeId: validSalesId,
-        status: 'ACTIVE',
-        startedAt: new Date(),
-        expiresAt,
-        idempotencyKey: idempotencyKey || `lock-${validSalesId}-${productId}-${Date.now()}`
-      }
-    });
-
-    // Generate VietQR payment intent payload
-    const depositAmount = 100000000; // 100M VND
-    const providerRef = `AHS-${product.productCode.replace('-', '')}-${Math.floor(Math.random() * 89999 + 10000)}`;
-    const qrPayload = `00020101021238580010A000000727012800069704230114${providerRef}52045311530370454${depositAmount}5802VN5917AHS REAL ESTATE6006HA NOI6304`;
-
-    const payment = await tx.paymentTransaction.create({
-      data: {
-        lockId: lock.id,
-        provider: 'VIETQR_AHS',
-        providerReference: providerRef,
-        amount: depositAmount,
-        currency: 'VND',
-        status: 'PENDING',
-        expiresAt,
-        qrPayload
-      }
-    });
-
-    // Update product status to LOCKED
-    await tx.product.update({
-      where: { id: productId },
-      data: {
-        status: 'LOCKED',
-        version: { increment: 1 }
-      }
-    });
-
-    // Record status history
-    await tx.productStatusHistory.create({
-      data: {
-        productId,
-        fromStatus: 'AVAILABLE',
-        toStatus: 'LOCKED',
-        reason: `Khóa giữ căn 30 phút bởi Sales: ${salesEmployeeName}`,
-        actorId: salesEmployeeId
-      }
-    });
-
-    return { lock, payment };
+  // Pre-fetch product price and duration outside transaction
+  const product = await db.product.findUnique({
+    where: { id: productId },
+    include: { project: true, prices: true }
   });
 
-  await createAuditLog({
-    actorId: salesEmployeeId,
-    actorName: salesEmployeeName,
-    action: 'LOCK_PRODUCT',
-    entityType: 'PRODUCT_LOCK',
-    entityId: result.lock.id,
-    afterJson: { productId, expiresAt: result.lock.expiresAt }
-  });
+  if (!product) {
+    throw new Error('PRODUCT_NOT_FOUND');
+  }
 
-  return { success: true, lock: result.lock, payment: result.payment, isDuplicate: false };
+  try {
+    // Atomically check product status & acquire lock using row-level conditional update
+    const result = await db.$transaction(async (tx) => {
+      // Atomic conditional update to prevent race condition
+      const updatedCount = await tx.product.updateMany({
+        where: {
+          id: productId,
+          status: 'AVAILABLE'
+        },
+        data: {
+          status: 'LOCKED',
+          version: { increment: 1 }
+        }
+      });
+
+      if (updatedCount.count === 0) {
+        throw new Error('PRODUCT_ALREADY_LOCKED');
+      }
+
+      // Dynamic lock duration & deposit amount
+      const lockDurationMinutes = product.project?.lockDurationMinutes || 30;
+      const depositAmount = product.prices[0]?.depositAmount || 100000000;
+      const expiresAt = new Date(Date.now() + lockDurationMinutes * 60 * 1000);
+
+      const lock = await tx.productLock.create({
+        data: {
+          productId,
+          salesEmployeeId: validSalesId,
+          status: 'ACTIVE',
+          startedAt: new Date(),
+          expiresAt,
+          idempotencyKey: idempotencyKey || `lock-${validSalesId}-${productId}-${Date.now()}`
+        }
+      });
+
+      // Generate VietQR payment intent payload
+      const providerRef = `AHS-${product.productCode.replace('-', '')}-${Math.floor(Math.random() * 89999 + 10000)}`;
+      const qrPayload = `00020101021238580010A000000727012800069704230114${providerRef}52045311530370454${depositAmount}5802VN5917AHS REAL ESTATE6006HA NOI6304`;
+
+      const payment = await tx.paymentTransaction.create({
+        data: {
+          lockId: lock.id,
+          provider: 'VIETQR_AHS',
+          providerReference: providerRef,
+          amount: depositAmount,
+          currency: 'VND',
+          status: 'PENDING',
+          expiresAt,
+          qrPayload
+        }
+      });
+
+      // Record status history
+      await tx.productStatusHistory.create({
+        data: {
+          productId,
+          fromStatus: 'AVAILABLE',
+          toStatus: 'LOCKED',
+          reason: `Khóa giữ căn ${lockDurationMinutes} phút bởi Sales: ${salesEmployeeName}`,
+          actorId: validSalesId
+        }
+      });
+
+      return { lock, payment };
+    }, { timeout: 30000 });
+
+    await createAuditLog({
+      actorId: validSalesId,
+      actorName: salesEmployeeName,
+      action: 'LOCK_PRODUCT',
+      entityType: 'PRODUCT_LOCK',
+      entityId: result.lock.id,
+      afterJson: { productId, expiresAt: result.lock.expiresAt }
+    });
+
+    return { success: true, lock: result.lock, payment: result.payment, isDuplicate: false };
+  } catch (err: any) {
+    if (
+      err.message === 'PRODUCT_ALREADY_LOCKED' ||
+      err.message?.includes('Transaction already closed') ||
+      err.message?.includes('database failed to respond') ||
+      err.message?.includes('timed out') ||
+      err.message?.includes('expired transaction')
+    ) {
+      throw new Error('PRODUCT_ALREADY_LOCKED');
+    }
+    throw err;
+  }
 }
