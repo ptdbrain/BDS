@@ -33,15 +33,19 @@ export function CustomerManager({
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [selectedVerification, setSelectedVerification] = useState<any | null>(null);
 
-  // Form State
+  // Form State with 8 fields required by sửa app.md
   const [formData, setFormData] = useState({
     fullName: '',
+    gender: 'Nam',
+    dateOfBirth: '1992-05-15',
     phone: '',
     cccd: '',
+    permanentAddress: 'Số 88 Xuân Diệu, Tây Hồ, Hà Nội',
+    contactAddress: 'Số 88 Xuân Diệu, Tây Hồ, Hà Nội',
     email: '',
-    address: 'Số 88 Xuân Diệu, Tây Hồ, Hà Nội',
     consent: true
   });
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string>('');
   const [formSuccess, setFormSuccess] = useState<string>('');
 
@@ -54,35 +58,83 @@ export function CustomerManager({
     return c.fullName.toLowerCase().includes(q) || c.phone.includes(q) || c.cccdDisplay.includes(q);
   });
 
-  const handleCreateCustomer = async (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');
 
     if (!formData.fullName || !formData.phone || !formData.cccd) {
-      setFormError('Họ tên, Số điện thoại và CCCD là bắt buộc.');
+      setFormError('Họ tên, Số điện thoại và Căn cước (CCCD) là bắt buộc.');
       return;
     }
 
     try {
-      const res = await fetch('/api/v1/customers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
+      if (editingCustomerId) {
+        const res = await fetch(`/api/v1/customers/${editingCustomerId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        if (!res.ok) throw new Error('Cập nhật hồ sơ thất bại');
+        setFormSuccess('Cập nhật thông tin khách hàng thành công!');
+      } else {
+        const res = await fetch('/api/v1/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        const data = await res.json();
 
-      if (!res.ok) {
-        setFormError(data.error || 'Tạo hồ sơ thất bại.');
-        return;
+        if (!res.ok) {
+          setFormError(data.error || 'Tạo hồ sơ thất bại.');
+          return;
+        }
+        setFormSuccess(data.data?.isDuplicateFound ? 'Đã liên kết hồ sơ khách hàng sẵn có!' : 'Khai báo thông tin khách hàng thành công!');
       }
 
-      setFormSuccess(data.data?.isDuplicateFound ? 'Đã liên kết hồ sơ khách hàng sẵn có!' : 'Tạo hồ sơ khách hàng mới thành công và đã gửi Sales Admin duyệt!');
-      setFormData({ fullName: '', phone: '', cccd: '', email: '', address: '', consent: true });
+      setFormData({
+        fullName: '',
+        gender: 'Nam',
+        dateOfBirth: '1992-05-15',
+        phone: '',
+        cccd: '',
+        permanentAddress: 'Số 88 Xuân Diệu, Tây Hồ, Hà Nội',
+        contactAddress: 'Số 88 Xuân Diệu, Tây Hồ, Hà Nội',
+        email: '',
+        consent: true
+      });
+      setEditingCustomerId(null);
+      setIsFormOpen(false);
       onRefresh();
     } catch (err: any) {
       setFormError(err.message);
     }
+  };
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    if (!confirm('Bạn có chắc chắn muốn xóa thông tin khách hàng này?')) return;
+    try {
+      const res = await fetch(`/api/v1/customers/${customerId}`, { method: 'DELETE' });
+      if (res.ok) onRefresh();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const startEditCustomer = (cust: any) => {
+    setEditingCustomerId(cust.id);
+    setFormData({
+      fullName: cust.fullName || '',
+      gender: cust.gender || 'Nam',
+      dateOfBirth: cust.dateOfBirth || '',
+      phone: cust.phone || '',
+      cccd: cust.cccd || '',
+      permanentAddress: cust.permanentAddress || '',
+      contactAddress: cust.contactAddress || '',
+      email: cust.email || '',
+      consent: true
+    });
+    setIsFormOpen(true);
   };
 
   const handleApproveVerification = async (verId: string) => {
@@ -176,10 +228,10 @@ export function CustomerManager({
             <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-white">✕</button>
           </div>
 
-          <form onSubmit={handleCreateCustomer} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          <form onSubmit={handleSaveCustomer} className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Họ và Tên (*)</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">1. Họ và Tên (*)</label>
                 <input
                   type="text"
                   placeholder="Nguyễn Văn A"
@@ -190,7 +242,30 @@ export function CustomerManager({
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Số Điện Thoại (*)</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">2. Giới Tính</label>
+                <select
+                  value={formData.gender}
+                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none focus:border-brand-500"
+                >
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">3. Ngày Sinh</label>
+                <input
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">4. Số Điện Thoại (*)</label>
                 <input
                   type="text"
                   placeholder="0987654321"
@@ -201,7 +276,7 @@ export function CustomerManager({
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Số CCCD / Hộ Chiếu (*)</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">5. Căn Cước / CCCD (*)</label>
                 <input
                   type="text"
                   placeholder="012345678912"
@@ -212,7 +287,7 @@ export function CustomerManager({
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Email Liên Hệ</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">6. Email Liên Hệ</label>
                 <input
                   type="email"
                   placeholder="khachhang@gmail.com"
@@ -223,12 +298,23 @@ export function CustomerManager({
               </div>
 
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-bold text-slate-300 block mb-1">Địa Chỉ Thường Trú</label>
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">7. Địa Chỉ Thường Trú</label>
                 <input
                   type="text"
-                  placeholder="Số 1, đường Lý Thường Kiệt, Hà Nội"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  placeholder="Số 88 Xuân Diệu, Tây Hồ, Hà Nội"
+                  value={formData.permanentAddress}
+                  onChange={(e) => setFormData({ ...formData, permanentAddress: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none focus:border-brand-500"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="text-[11px] font-bold text-slate-300 block mb-1">8. Địa Chỉ Liên Hệ</label>
+                <input
+                  type="text"
+                  placeholder="Số 88 Xuân Diệu, Tây Hồ, Hà Nội"
+                  value={formData.contactAddress}
+                  onChange={(e) => setFormData({ ...formData, contactAddress: e.target.value })}
                   className="w-full bg-slate-900 border border-slate-700 text-xs text-white p-2.5 rounded-xl outline-none focus:border-brand-500"
                 />
               </div>
@@ -312,7 +398,23 @@ export function CustomerManager({
                       <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold">Chờ Sales Admin Duyệt</span>
                     )}
                   </td>
-                  <td className="p-3.5 text-right">
+                  <td className="p-3.5 text-right space-x-2">
+                    {currentRole === 'SALES' && (
+                      <>
+                        <button
+                          onClick={() => startEditCustomer(cust)}
+                          className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-brand-400 font-bold text-[11px] transition"
+                        >
+                          Sửa
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCustomer(cust.id)}
+                          className="px-2.5 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 font-bold text-[11px] transition"
+                        >
+                          Xóa
+                        </button>
+                      </>
+                    )}
                     {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && latestVer && !isVerified && (
                       <button
                         onClick={() => setSelectedVerification(latestVer)}

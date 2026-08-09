@@ -30,8 +30,17 @@ export async function GET(request: Request) {
     const revealPII = searchParams.get('revealPII') === 'true';
     const actorId = searchParams.get('actorId') || 'UNKNOWN';
     const actorName = searchParams.get('actorName') || 'Nguoi dung he thong';
+    const salesEmployeeId = searchParams.get('salesEmployeeId');
+
+    const whereCondition: any = {};
+    if (salesEmployeeId) {
+      whereCondition.verifications = {
+        some: { submittedById: salesEmployeeId }
+      };
+    }
 
     const customers = await db.customer.findMany({
+      where: whereCondition,
       include: {
         verifications: { orderBy: { createdAt: 'desc' } },
         contracts: true
@@ -53,11 +62,27 @@ export async function GET(request: Request) {
       const plainCCCD = decryptPII(c.cccdCiphertext);
       const plainAddress = decryptPII(c.addressCiphertext);
 
+      let extra: any = {};
+      try {
+        if (plainAddress.startsWith('{')) {
+          extra = JSON.parse(plainAddress);
+        } else {
+          extra = { permanentAddress: plainAddress, contactAddress: plainAddress };
+        }
+      } catch {
+        extra = { permanentAddress: plainAddress, contactAddress: plainAddress };
+      }
+
       return {
         id: c.id,
         fullName: c.fullName,
+        gender: extra.gender || 'Nam',
+        dateOfBirth: extra.dateOfBirth || '1990-01-01',
         phone: c.phone,
         email: c.email,
+        cccd: plainCCCD,
+        permanentAddress: extra.permanentAddress || plainAddress,
+        contactAddress: extra.contactAddress || plainAddress,
         verificationStatus: c.verificationStatus,
         createdAt: c.createdAt,
         updatedAt: c.updatedAt,
@@ -65,7 +90,7 @@ export async function GET(request: Request) {
         contracts: c.contracts,
         cccdDisplay: revealPII ? plainCCCD : maskCCCD(c.cccdCiphertext),
         phoneDisplay: revealPII ? c.phone : maskPhone(c.phone),
-        addressDisplay: revealPII ? plainAddress : maskAddress(c.addressCiphertext)
+        addressDisplay: revealPII ? (extra.permanentAddress || plainAddress) : maskAddress(c.addressCiphertext)
       };
     });
 
@@ -80,9 +105,13 @@ export async function POST(request: Request) {
     const body = await request.json();
     const {
       fullName,
+      gender = 'Nam',
+      dateOfBirth = '',
       phone,
       email,
       cccd,
+      permanentAddress,
+      contactAddress,
       address,
       lockId,
       actorId = 'emp_sales_01',
@@ -111,7 +140,17 @@ export async function POST(request: Request) {
 
     const cccdHash = hashPII(cccd.trim());
     const cccdCiphertext = encryptPII(cccd.trim());
-    const addressCiphertext = encryptPII(address?.trim() || 'Hà Nội');
+
+    const permAddr = permanentAddress || address || 'Hà Nội';
+    const contAddr = contactAddress || permAddr;
+    const addressPayload = JSON.stringify({
+      gender,
+      dateOfBirth,
+      permanentAddress: permAddr,
+      contactAddress: contAddr
+    });
+
+    const addressCiphertext = encryptPII(addressPayload);
 
     // Duplicate detection check via hash
     const existing = await db.customer.findFirst({
@@ -166,6 +205,10 @@ export async function POST(request: Request) {
       data: {
         customer: {
           ...customer,
+          gender,
+          dateOfBirth,
+          permanentAddress: permAddr,
+          contactAddress: contAddr,
           cccdDisplay: maskCCCD(customer.cccdCiphertext),
           phoneDisplay: maskPhone(customer.phone)
         },

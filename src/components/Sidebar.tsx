@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { UserRole } from '@/lib/types';
 import {
   Grid,
   Clock,
@@ -14,8 +15,9 @@ import {
 
 export type TabType =
   | 'inventory'
-  | 'locks'
   | 'customers'
+  | 'transactions_revenue'
+  | 'locks'
   | 'contracts'
   | 'reports'
   | 'audit';
@@ -23,6 +25,7 @@ export type TabType =
 interface SidebarProps {
   activeTab: TabType;
   onTabChange: (tab: TabType) => void;
+  currentRole?: UserRole;
   activeLocksCount: number;
   pendingVerificationsCount: number;
   pendingContractsCount: number;
@@ -31,11 +34,41 @@ interface SidebarProps {
 export function Sidebar({
   activeTab,
   onTabChange,
+  currentRole = 'SALES',
   activeLocksCount,
   pendingVerificationsCount,
   pendingContractsCount
 }: SidebarProps) {
-  const navItems = [
+  // Sales Agent gets strictly 3 items as specified in sửa app.md
+  const salesNavItems = [
+    {
+      id: 'inventory' as TabType,
+      label: '1. Dự Án & Bảng Hàng',
+      desc: 'Thông tin dự án & Quỹ hàng (Lock)',
+      icon: Grid,
+      badge: activeLocksCount > 0 ? activeLocksCount : null,
+      badgeColor: 'bg-amber-500'
+    },
+    {
+      id: 'customers' as TabType,
+      label: '2. Thông Tin Khách Hàng Cá Nhân',
+      desc: 'Quản lý khách mình bán (CRUD)',
+      icon: UserCheck,
+      badge: null,
+      badgeColor: 'bg-brand-500'
+    },
+    {
+      id: 'transactions_revenue' as TabType,
+      label: '3. Lịch Sử & Doanh Số Cá Nhân',
+      desc: 'Báo cáo doanh số cá nhân (Chỉ xem)',
+      icon: BarChart3,
+      badge: null,
+      badgeColor: 'bg-purple-500'
+    }
+  ];
+
+  // Admin / Management full nav items
+  const adminNavItems = [
     {
       id: 'inventory' as TabType,
       label: 'Bảng Hàng & Quỹ Hàng',
@@ -82,6 +115,8 @@ export function Sidebar({
       badge: null
     }
   ];
+
+  const navItems = currentRole === 'SALES' ? salesNavItems : adminNavItems;
 
   return (
     <aside className="w-64 glass-panel border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0 h-[calc(100vh-65px)] sticky top-[65px]">

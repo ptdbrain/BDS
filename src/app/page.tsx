@@ -11,6 +11,8 @@ import { ContractWorkflow } from '@/components/ContractWorkflow';
 import { ReportsDashboard } from '@/components/ReportsDashboard';
 import { AuditTrail } from '@/components/AuditTrail';
 import { ImportModal } from '@/components/ImportModal';
+import { PersonalRevenueView } from '@/components/PersonalRevenueView';
+import { VietQRModal } from '@/components/VietQRModal';
 
 export default function Home() {
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
@@ -28,6 +30,7 @@ export default function Home() {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
+  const [activeLockModal, setActiveLockModal] = useState<any | null>(null);
 
   // Fetch Projects
   const fetchProjects = async () => {
@@ -164,7 +167,7 @@ export default function Home() {
       }
 
       refreshAllData();
-      setActiveTab('locks');
+      setActiveLockModal(data.data?.lock || data.data);
     } catch (err: any) {
       alert(err.message);
     }
@@ -187,7 +190,7 @@ export default function Home() {
   };
 
   // Action: Transition from Lock to Customer Intake
-  const handleProceedToCustomer = (lock: any) => {
+  const handleProceedToCustomer = (lock?: any) => {
     setActiveTab('customers');
   };
 
@@ -209,6 +212,7 @@ export default function Home() {
         <Sidebar
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          currentRole={currentRole}
           activeLocksCount={activeLocksCount}
           pendingVerificationsCount={pendingVerificationsCount}
           pendingContractsCount={pendingContractsCount}
@@ -226,6 +230,14 @@ export default function Home() {
               onOpenImportModal={() => setIsImportModalOpen(true)}
               onRefresh={refreshAllData}
               isLoading={isLoading}
+            />
+          )}
+
+          {activeTab === 'transactions_revenue' && (
+            <PersonalRevenueView
+              locks={locks}
+              contracts={contracts}
+              reportData={reportData}
             />
           )}
 
@@ -271,6 +283,22 @@ export default function Home() {
           )}
         </main>
       </div>
+
+      {/* Instant VietQR Payment Modal */}
+      {activeLockModal && (
+        <VietQRModal
+          lock={activeLockModal}
+          isOpen={!!activeLockModal}
+          onClose={() => setActiveLockModal(null)}
+          onPaymentSuccess={() => {
+            refreshAllData();
+          }}
+          onProceedToCustomer={() => {
+            setActiveLockModal(null);
+            setActiveTab('customers');
+          }}
+        />
+      )}
 
       {/* Bulk Import Modal */}
       <ImportModal
