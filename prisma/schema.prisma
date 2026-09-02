@@ -29,6 +29,7 @@ model Project {
   lockDurationMinutes Int           @default(30)
   saleOpenAt          DateTime?
   saleCloseAt         DateTime?
+  imagesJson          String?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
   products            Product[]
@@ -211,12 +212,20 @@ model Contract {
   paymentPlanId   String
   paymentPlan     PaymentPlan      @relation(fields: [paymentPlanId], references: [id])
   agreedPrice     Float
-  status          String           @default("DRAFT") // DRAFT, PENDING_REVIEW, CHANGE_REQUESTED, APPROVED, REJECTED, SIGNED, CANCELLED
-  snapshotJson    String?          // Full snapshot of prices, customer, product state
-  signedAt        DateTime?
-  version         Int              @default(1)
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  status              String           @default("DRAFT") // DRAFT, PENDING_REVIEW, CHANGE_REQUESTED, APPROVED, REJECTED, SIGNED, CANCELLED
+  signingStatus       String?          @default("CHUA_KY") // CHUA_KY, DA_KY, CHAM_KY
+  signedDate          DateTime?
+  dealRevenue         Float?
+  commissionStatus    String?          @default("DU_KIEN_TRA") // DA_TRA, DU_KIEN_TRA
+  commissionDueDate   String?          // dd/mm/yyyy
+  commissionAmount    Float?
+  investorContractNo  String?
+  investorNotes       String?
+  snapshotJson        String?          // Full snapshot of prices, customer, product state
+  signedAt            DateTime?
+  version             Int              @default(1)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
   reviews         ContractReview[]
 }
 

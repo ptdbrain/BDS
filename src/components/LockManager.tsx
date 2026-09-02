@@ -1,7 +1,6 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
+import { UserRole } from '@/lib/types';
 import {
   Clock,
   QrCode,
@@ -12,7 +11,9 @@ import {
   RefreshCw,
   Copy,
   Zap,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Eye
 } from 'lucide-react';
 
 interface LockManagerProps {
@@ -20,14 +21,17 @@ interface LockManagerProps {
   onRefresh: () => void;
   onCancelLock: (lockId: string) => void;
   onProceedToCustomer: (lock: any) => void;
+  currentRole?: UserRole;
 }
 
 export function LockManager({
   locks,
   onRefresh,
   onCancelLock,
-  onProceedToCustomer
+  onProceedToCustomer,
+  currentRole = 'SALES'
 }: LockManagerProps) {
+  const [isConfirmingTransfer, setIsConfirmingTransfer] = useState<string | null>(null);
   const [selectedLockForQR, setSelectedLockForQR] = useState<any | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
@@ -116,6 +120,39 @@ export function LockManager({
     }
   };
 
+  // Sales Admin confirms transfer received -> converts product status to SOLD directly
+  const handleAdminConfirmTransfer = async (lockId: string) => {
+    if (!confirm('Xác nhận đã nhận chuyển khoản cọc cho căn này?\nHệ thống sẽ chuyển trạng thái căn từ Lock sang ĐÃ BÁN.')) {
+      return;
+    }
+
+    setIsConfirmingTransfer(lockId);
+    try {
+      const res = await fetch(`/api/v1/locks/${lockId}/confirm-transfer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorId: 'emp_admin_01',
+          actorName: 'Phạm Thị Mai',
+          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc hợp lệ từ ngân hàng'
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.detail || data.error || 'Xác nhận chuyển khoản thất bại');
+        return;
+      }
+
+      alert(data.message || 'Xác nhận thành công! Căn đã chuyển trạng thái sang ĐÃ BÁN.');
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsConfirmingTransfer(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header Banner */}
@@ -126,8 +163,32 @@ export function LockManager({
               <Clock className="w-6 h-6 animate-spin-slow" />
             </div>
             <div>
-              <h2 className="text-lg font-black text-white">Quản Lý Khóa Căn 30 Phút & Thanh Toán Cọc</h2>
-              <p className="text-xs text-slate-400">Tự động đối soát chuyển khoản VietQR & giải phóng căn hết hạn</p>
+              <div className="flex items-center space-x-2">
+                <h2 className="text-lg font-black text-white">
+                  {currentRole === 'PRODUCT_ADMIN'
+                    ? 'Danh Mục Giao Dịch (Khóa Căn & Thanh Toán) - Chỉ Xem'
+                    : currentRole === 'SALES_ADMIN'
+                    ? 'Danh Mục Giao Dịch - Xác Nhận Tiền Chuyển Khoản'
+                    : 'Quản Lý Khóa Căn 30 Phút & Thanh Toán Cọc'}
+                </h2>
+                {currentRole === 'PRODUCT_ADMIN' && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-amber-400 border border-amber-500/30">
+                    CHỈ XEM (READ-ONLY)
+                  </span>
+                )}
+                {currentRole === 'SALES_ADMIN' && (
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    SALES ADMIN WORKBENCH
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-400">
+                {currentRole === 'PRODUCT_ADMIN'
+                  ? 'Theo dõi thời gian khóa giữ căn 30 phút và tình trạng thanh toán của quỹ hàng (không thao tác xác nhận).'
+                  : currentRole === 'SALES_ADMIN'
+                  ? 'Kiểm tra tiền về tài khoản, nhấn xác nhận để chuyển căn từ Lock sang Đã Bán.'
+                  : 'Tự động đối soát chuyển khoản VietQR & giải phóng căn hết hạn'}
+              </p>
             </div>
           </div>
         </div>
@@ -207,24 +268,64 @@ export function LockManager({
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex items-center space-x-2 pt-2">
-                    <button
-                      onClick={() => setSelectedLockForQR(lock)}
-                      className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-accent-cyan text-white text-xs font-extrabold uppercase flex items-center justify-center space-x-1.5 shadow-lg hover:brightness-110 transition"
-                    >
-                      <QrCode className="w-4 h-4" />
-                      <span>Tạo QR VietQR</span>
-                    </button>
+                  {/* Action Buttons per Role */}
+                  {currentRole === 'PRODUCT_ADMIN' ? (
+                    // PRODUCT ADMIN: READ-ONLY (No action buttons)
+                    <div className="pt-2">
+                      <div className="py-2 px-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center text-slate-400 text-[11px] font-semibold flex items-center justify-center space-x-1.5">
+                        <Eye className="w-3.5 h-3.5 text-brand-400" />
+                        <span>Chế độ chỉ xem (Không có quyền xác nhận cọc)</span>
+                      </div>
+                    </div>
+                  ) : currentRole === 'SALES_ADMIN' ? (
+                    // SALES ADMIN: Confirm Transfer Button (Converts to SOLD)
+                    <div className="space-y-2 pt-2">
+                      <button
+                        onClick={() => handleAdminConfirmTransfer(lock.id)}
+                        disabled={isConfirmingTransfer === lock.id}
+                        className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition"
+                      >
+                        <CheckCircle className="w-4 h-4" />
+                        <span>{isConfirmingTransfer === lock.id ? 'Đang cập nhật...' : 'Xác Nhận Đã Nhận Chuyển Khoản → Đã Bán'}</span>
+                      </button>
 
-                    <button
-                      onClick={() => onCancelLock(lock.id)}
-                      className="py-2 px-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition"
-                      title="Hủy Lock"
-                    >
-                      Hủy Lock
-                    </button>
-                  </div>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedLockForQR(lock)}
+                          className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold flex items-center justify-center space-x-1 transition"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Xem QR Cọc</span>
+                        </button>
+                        <button
+                          onClick={() => onCancelLock(lock.id)}
+                          className="py-1.5 px-2.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 text-[11px] font-semibold transition"
+                          title="Hủy Lock"
+                        >
+                          Hủy Lock
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // SALES & OTHER: Standard Sales Action Buttons
+                    <div className="flex items-center space-x-2 pt-2">
+                      <button
+                        onClick={() => setSelectedLockForQR(lock)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-accent-cyan text-white text-xs font-extrabold uppercase flex items-center justify-center space-x-1.5 shadow-lg hover:brightness-110 transition"
+                      >
+                        <QrCode className="w-4 h-4" />
+                        <span>Tạo QR VietQR</span>
+                      </button>
+
+                      <button
+                        onClick={() => onCancelLock(lock.id)}
+                        className="py-2 px-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition"
+                        title="Hủy Lock"
+                      >
+                        Hủy Lock
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

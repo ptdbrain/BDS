@@ -198,13 +198,30 @@ export default function Home() {
   const pendingVerificationsCount = customers.filter(c => c.verificationStatus === 'PENDING_VERIFICATION').length;
   const pendingContractsCount = contracts.filter(c => c.status === 'PENDING_REVIEW').length;
 
+  const handleRoleChange = (role: UserRole) => {
+    setCurrentRole(role);
+    if (role === 'PRODUCT_ADMIN') {
+      if (activeTab === 'customers' || activeTab === 'transactions_revenue' || activeTab === 'contracts' || activeTab === 'audit') {
+        setActiveTab('inventory');
+      }
+    } else if (role === 'SALES_ADMIN') {
+      if (activeTab === 'transactions_revenue' || activeTab === 'audit') {
+        setActiveTab('locks');
+      }
+    } else if (role === 'SALES') {
+      if (activeTab === 'locks' || activeTab === 'contracts' || activeTab === 'reports' || activeTab === 'audit') {
+        setActiveTab('inventory');
+      }
+    }
+  };
+
   const currentProject = projects.find(p => p.id === selectedProjectId);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#080b11]">
       <Navbar
         currentRole={currentRole}
-        onRoleChange={setCurrentRole}
+        onRoleChange={handleRoleChange}
         activeProjectName={currentProject?.name}
       />
 
@@ -247,6 +264,7 @@ export default function Home() {
               onRefresh={refreshAllData}
               onCancelLock={handleCancelLock}
               onProceedToCustomer={handleProceedToCustomer}
+              currentRole={currentRole}
             />
           )}
 

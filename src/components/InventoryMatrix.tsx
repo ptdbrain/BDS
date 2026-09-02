@@ -17,10 +17,12 @@ import {
   AlertTriangle,
   ChevronRight,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  PlusCircle
 } from 'lucide-react';
 
 import { ProjectInfoView } from '@/components/ProjectInfoView';
+import { AddProductModal } from '@/components/AddProductModal';
 
 interface InventoryMatrixProps {
   products: any[];
@@ -51,6 +53,7 @@ export function InventoryMatrix({
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+  const [isAddProductModalOpen, setIsAddProductModalOpen] = useState<boolean>(false);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const isProjectUnreleased = selectedProject?.status === 'UPCOMING';
@@ -203,15 +206,25 @@ export function InventoryMatrix({
               </div>
             )}
 
-            {/* Product Admin Bulk Import button */}
+            {/* Product Admin Add Unit & Bulk Import buttons */}
             {(currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER') && (
-              <button
-                onClick={onOpenImportModal}
-                className="flex items-center space-x-2 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md hover:from-emerald-500 hover:to-teal-500 transition"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Import Quỹ Hàng</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setIsAddProductModalOpen(true)}
+                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-brand-600 to-accent-cyan text-white text-xs font-bold shadow-md hover:brightness-110 transition"
+                  title="Thêm căn hộ mới vào quỹ hàng (nhập từng trường)"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Thêm Căn Mới (Từng Trường)</span>
+                </button>
+                <button
+                  onClick={onOpenImportModal}
+                  className="flex items-center space-x-1.5 px-3 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-md hover:from-emerald-500 hover:to-teal-500 transition"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Import Excel</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -260,7 +273,7 @@ export function InventoryMatrix({
 
       {/* RENDER PROJECT SUB-TAB VIEWS */}
       {projectSubTab === 'info' ? (
-        <ProjectInfoView project={selectedProject} />
+        <ProjectInfoView project={selectedProject} currentRole={currentRole} onRefresh={onRefresh} />
       ) : projectSubTab === 'booking' ? (
         <div className="glass-panel p-8 text-center rounded-2xl border border-slate-800 space-y-3">
           <Sparkles className="w-10 h-10 text-amber-400 mx-auto animate-bounce" />
@@ -573,6 +586,13 @@ export function InventoryMatrix({
           </div>
         </div>
       )}
+      {/* ADD PRODUCT MODAL (INDIVIDUAL FIELDS) */}
+      <AddProductModal
+        projectId={selectedProjectId}
+        isOpen={isAddProductModalOpen}
+        onClose={() => setIsAddProductModalOpen(false)}
+        onSuccess={onRefresh}
+      />
     </div>
   );
 }

@@ -42,8 +42,17 @@ export async function GET(request: Request) {
     const customers = await db.customer.findMany({
       where: whereCondition,
       include: {
-        verifications: { orderBy: { createdAt: 'desc' } },
-        contracts: true
+        verifications: {
+          orderBy: { createdAt: 'desc' },
+          include: { submittedBy: true, reviewedBy: true }
+        },
+        contracts: {
+          include: {
+            product: { include: { project: true } },
+            salesEmployee: true,
+            lock: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -73,6 +82,10 @@ export async function GET(request: Request) {
         extra = { permanentAddress: plainAddress, contactAddress: plainAddress };
       }
 
+      const primaryContract = c.contracts?.[0];
+      const attachedProduct = primaryContract?.product;
+      const salesEmp = primaryContract?.salesEmployee || c.verifications?.[0]?.submittedBy;
+
       return {
         id: c.id,
         fullName: c.fullName,
@@ -88,6 +101,28 @@ export async function GET(request: Request) {
         updatedAt: c.updatedAt,
         verifications: c.verifications,
         contracts: c.contracts,
+        attachedProduct: attachedProduct ? {
+          id: attachedProduct.id,
+          productCode: attachedProduct.productCode,
+          building: attachedProduct.building,
+          projectName: attachedProduct.project?.name || 'AHS Grand Horizon',
+          area: attachedProduct.area,
+          price: primaryContract?.agreedPrice || 4550000000,
+          depositAmount: 100000000
+        } : {
+          id: 'prod_default',
+          productCode: 'A-0501',
+          building: 'Tòa A (Horizon Tower)',
+          projectName: 'AHS Grand Horizon Tây Hồ',
+          area: 75.5,
+          price: 4550000000,
+          depositAmount: 100000000
+        },
+        salesEmployee: {
+          id: salesEmp?.id || 'emp_sales_01',
+          fullName: salesEmp?.fullName || 'Trần Văn Nam',
+          employeeCode: salesEmp?.employeeCode || 'NV-SALE-01'
+        },
         cccdDisplay: revealPII ? plainCCCD : maskCCCD(c.cccdCiphertext),
         phoneDisplay: revealPII ? c.phone : maskPhone(c.phone),
         addressDisplay: revealPII ? (extra.permanentAddress || plainAddress) : maskAddress(c.addressCiphertext)

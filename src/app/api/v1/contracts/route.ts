@@ -32,12 +32,20 @@ export async function POST(request: Request) {
       lockId,
       paymentPlanId,
       agreedPrice,
+      investorContractNo,
+      signedDate,
+      signingStatus = 'CHUA_KY',
+      dealRevenue,
+      commissionStatus = 'DU_KIEN_TRA',
+      commissionDueDate,
+      commissionAmount,
+      investorNotes,
       salesEmployeeId = 'emp_sales_01',
       salesEmployeeName = 'Trần Văn Nam'
     } = body;
 
-    if (!productId || !customerId || !paymentPlanId) {
-      return NextResponse.json({ error: 'Sản phẩm, khách hàng và phương án thanh toán là bắt buộc' }, { status: 400 });
+    if (!productId || !customerId) {
+      return NextResponse.json({ error: 'Sản phẩm và khách hàng là bắt buộc' }, { status: 400 });
     }
 
     const product = await db.product.findUnique({
@@ -53,23 +61,74 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc khách hàng' }, { status: 400 });
     }
 
-    if (product.status === 'SOLD') {
-      return NextResponse.json({
-        type: 'urn:ahs:problem:product-already-sold',
-        title: 'Sản phẩm đã bán',
-        status: 400,
-        code: 'PRODUCT_ALREADY_SOLD',
-        detail: 'Sản phẩm này đã được bán thành công cho khách hàng khác.'
-      }, { status: 400 });
+    // Resolve payment plan if not provided
+    let resolvedPlanId = paymentPlanId;
+    if (!resolvedPlanId) {
+      const plan = await db.paymentPlan.findFirst({
+        where: { projectId: product.projectId }
+      });
+      resolvedPlanId = plan?.id;
     }
 
-    // Resolve accurate agreed price from product price list if not provided
-    const resolvedPrice = agreedPrice || product.prices[0]?.amount || 4500000000;
+    if (!resolvedPlanId) {
+      const defaultPlan = await db.paymentPlan.create({
+        data: {
+          projectId: product.projectId,
+          code: 'STD-DEFAULT',
+          name: 'Thanh toán chuẩn theo tiến độ'
+        }
+      });
+      resolvedPlanId = defaultPlan.id;
+    }
+
+    // Resolve accurate agreed price / deal revenue
+    const resolvedPrice = dealRevenue || agreedPrice || product.prices[0]?.amount || 4500000000;
+    const resolvedCommission = commissionAmount !== undefined ? commissionAmount : (resolvedPrice * 0.03);
+
+    // Check if contract exists for this product
+    const existingContract = await db.contract.findFirst({
+      where: { productId }
+    });
+
+    if (existingContract) {
+      // Update existing contract with investor details
+      const updated = await db.contract.update({
+        where: { id: existingContract.id },
+        data: {
+          customerId,
+          lockId: lockId || existingContract.lockId,
+          salesEmployeeId: salesEmployeeId || existingContract.salesEmployeeId,
+          paymentPlanId: resolvedPlanId,
+          agreedPrice: resolvedPrice,
+          dealRevenue: resolvedPrice,
+          signingStatus,
+          signedDate: signedDate ? new Date(signedDate) : existingContract.signedDate,
+          signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : existingContract.signedAt,
+          status: signingStatus === 'DA_KY' ? 'SIGNED' : existingContract.status,
+          commissionStatus,
+          commissionDueDate: commissionDueDate || existingContract.commissionDueDate,
+          commissionAmount: resolvedCommission,
+          investorContractNo: investorContractNo || existingContract.investorContractNo,
+          investorNotes: investorNotes || existingContract.investorNotes
+        },
+        include: {
+          product: { include: { project: true } },
+          customer: true,
+          salesEmployee: true,
+          paymentPlan: true
+        }
+      });
+
+      return NextResponse.json({
+        message: 'Cập nhật thông tin hợp đồng CĐT thành công!',
+        data: updated
+      });
+    }
 
     // Generate formal contract number
     const year = new Date().getFullYear();
     const rand = Math.floor(Math.random() * 8999 + 1000);
-    const contractNumber = `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
+    const contractNumber = investorContractNo || `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
 
     const snapshot = {
       productCode: product.productCode,
@@ -79,6 +138,8 @@ export async function POST(request: Request) {
       customerName: customer.fullName,
       customerPhone: customer.phone,
       agreedPrice: resolvedPrice,
+      dealRevenue: resolvedPrice,
+      commissionAmount: resolvedCommission,
       createdAt: new Date().toISOString()
     };
 
@@ -89,10 +150,25 @@ export async function POST(request: Request) {
         customerId,
         lockId,
         salesEmployeeId,
-        paymentPlanId,
+        paymentPlanId: resolvedPlanId,
         agreedPrice: resolvedPrice,
-        status: 'PENDING_REVIEW',
+        dealRevenue: resolvedPrice,
+        signingStatus,
+        signedDate: signedDate ? new Date(signedDate) : null,
+        signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : null,
+        status: signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW',
+        commissionStatus,
+        commissionDueDate: commissionDueDate || '25/10/2026',
+        commissionAmount: resolvedCommission,
+        investorContractNo: investorContractNo || contractNumber,
+        investorNotes,
         snapshotJson: JSON.stringify(snapshot)
+      },
+      include: {
+        product: { include: { project: true } },
+        customer: true,
+        salesEmployee: true,
+        paymentPlan: true
       }
     });
 

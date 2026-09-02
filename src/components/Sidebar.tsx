@@ -31,6 +31,15 @@ interface SidebarProps {
   pendingContractsCount: number;
 }
 
+interface NavItem {
+  id: TabType;
+  label: string;
+  desc: string;
+  icon: any;
+  badge?: number | null;
+  badgeColor?: string;
+}
+
 export function Sidebar({
   activeTab,
   onTabChange,
@@ -39,8 +48,8 @@ export function Sidebar({
   pendingVerificationsCount,
   pendingContractsCount
 }: SidebarProps) {
-  // Sales Agent gets strictly 3 items as specified in sửa app.md
-  const salesNavItems = [
+  // 1. Sales Agent: 3 items strictly
+  const salesNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
       label: '1. Dự Án & Bảng Hàng',
@@ -67,8 +76,81 @@ export function Sidebar({
     }
   ];
 
-  // Admin / Management full nav items
-  const adminNavItems = [
+  // 2. Product Manager (Nhân viên Quản Lý Sản Phẩm):
+  // Có: Dự án & Bảng hàng (thêm ảnh/slide dự án + add từng trường quỹ hàng), Giao dịch [Chỉ xem], Báo cáo.
+  // KHÔNG CÓ: Thông tin khách hàng cá nhân & Doanh số cá nhân.
+  const productAdminNavItems: NavItem[] = [
+    {
+      id: 'inventory' as TabType,
+      label: '1. Dự Án & Bảng Hàng',
+      desc: 'Slide dự án & Quỹ hàng (Add căn)',
+      icon: Grid,
+      badge: null
+    },
+    {
+      id: 'locks' as TabType,
+      label: '2. Giao Dịch (Khóa Căn & T.Toán)',
+      desc: 'Xem căn lock & thanh toán (Chỉ xem)',
+      icon: Clock,
+      badge: activeLocksCount > 0 ? activeLocksCount : null,
+      badgeColor: 'bg-amber-500'
+    },
+    {
+      id: 'reports' as TabType,
+      label: '3. Báo Cáo Quỹ Căn & Dự Án',
+      desc: 'Tiến độ bán & tỷ lệ hấp thụ',
+      icon: BarChart3,
+      badge: null
+    }
+  ];
+
+  // 3. Sales Admin:
+  // - Giao dịch (khoá căn + ttoan): hiển thị căn lock, có nút xác nhận chuyển khoản -> chuyển Đã bán.
+  // - Thông tin khách hàng: tất cả KH giao dịch + căn đính kèm, duyệt / yêu cầu sửa, xuất file CĐT.
+  // - Danh mục hợp đồng: nhập HĐ từ CĐT, thời gian ký, trạng thái ký, doanh số, hoa hồng -> chuyển về cho Sales.
+  const salesAdminNavItems: NavItem[] = [
+    {
+      id: 'locks' as TabType,
+      label: '1. Giao Dịch (Khóa Căn & T.Toán)',
+      desc: 'Xác nhận chuyển khoản → Đã bán',
+      icon: Clock,
+      badge: activeLocksCount > 0 ? activeLocksCount : null,
+      badgeColor: 'bg-amber-500'
+    },
+    {
+      id: 'customers' as TabType,
+      label: '2. Thông Tin Khách Hàng',
+      desc: 'Kèm căn cọc, duyệt PII & Xuất file CĐT',
+      icon: UserCheck,
+      badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : null,
+      badgeColor: 'bg-brand-500'
+    },
+    {
+      id: 'contracts' as TabType,
+      label: '3. Danh Mục Hợp Đồng CĐT',
+      desc: 'Nhập HĐ, hoa hồng & trạng thái ký',
+      icon: FileText,
+      badge: pendingContractsCount > 0 ? pendingContractsCount : null,
+      badgeColor: 'bg-purple-500'
+    },
+    {
+      id: 'inventory' as TabType,
+      label: '4. Tra Cứu Bảng Hàng',
+      desc: 'Tra cứu trạng thái căn hộ',
+      icon: Grid,
+      badge: null
+    },
+    {
+      id: 'reports' as TabType,
+      label: '5. Báo Cáo Tổng Hợp',
+      desc: 'Báo cáo bán hàng & doanh thu',
+      icon: BarChart3,
+      badge: null
+    }
+  ];
+
+  // 4. Executive Management
+  const managerNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
       label: 'Bảng Hàng & Quỹ Hàng',
@@ -116,7 +198,14 @@ export function Sidebar({
     }
   ];
 
-  const navItems = currentRole === 'SALES' ? salesNavItems : adminNavItems;
+  let navItems: NavItem[] = salesNavItems;
+  if (currentRole === 'PRODUCT_ADMIN') {
+    navItems = productAdminNavItems;
+  } else if (currentRole === 'SALES_ADMIN') {
+    navItems = salesAdminNavItems;
+  } else if (currentRole === 'MANAGER') {
+    navItems = managerNavItems;
+  }
 
   return (
     <aside className="w-64 glass-panel border-r border-slate-800/80 p-4 flex flex-col justify-between shrink-0 h-[calc(100vh-65px)] sticky top-[65px]">
