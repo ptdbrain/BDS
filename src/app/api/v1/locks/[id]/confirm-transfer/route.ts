@@ -16,7 +16,10 @@ export async function POST(
 
     const lock = await db.productLock.findUnique({
       where: { id: params.id },
-      include: { product: true, payments: true }
+      include: {
+        product: { include: { prices: true } },
+        payments: true
+      }
     });
 
     if (!lock) {
@@ -59,6 +62,7 @@ export async function POST(
         where: { id: lock.productId },
         data: {
           status: 'SOLD',
+          trangthai: 'Đã bán',
           version: { increment: 1 }
         }
       });
@@ -74,10 +78,110 @@ export async function POST(
         }
       });
 
+      // 5. Automatically create or update Contract so BC_DoanhThu, BC_DoanhSo_NV, and Personal Revenue update in realtime
+      const price = lock.product.gianiemyet || lock.product.giaTTC || lock.product.prices[0]?.amount || 4500000000;
+      const commission = Math.round(price * 0.03);
+
+      let existingContract = await tx.contract.findFirst({
+        where: { productId: lock.productId }
+      });
+
+      if (existingContract) {
+        await tx.contract.update({
+          where: { id: existingContract.id },
+          data: {
+            status: 'SIGNED',
+            signingStatus: 'DA_KY',
+            signedDate: now,
+            signedAt: now,
+            dealRevenue: existingContract.dealRevenue || price,
+            agreedPrice: existingContract.agreedPrice || price,
+            salesEmployeeId: lock.salesEmployeeId || existingContract.salesEmployeeId,
+            commissionStatus: 'DU_KIEN_TRA',
+            commissionAmount: existingContract.commissionAmount || commission,
+            trangthaiHDMB: 'DA_KY',
+            doanhso: existingContract.dealRevenue || price,
+            hoahong: existingContract.commissionAmount || commission
+          }
+        });
+      } else {
+        let customer = await tx.customer.findFirst();
+        if (!customer) {
+          customer = await tx.customer.create({
+            data: {
+              fullName: 'Nguyễn Văn Hùng (Khách mua căn ' + lock.product.productCode + ')',
+              phone: '0912345678',
+              email: 'hung.nguyen@gmail.com',
+              cccdCiphertext: 'ENC_001200008888',
+              cccdHash: '001200008888',
+              addressCiphertext: 'Hà Nội',
+              verificationStatus: 'VERIFIED'
+            }
+          });
+        }
+
+        let plan = await tx.paymentPlan.findFirst({
+          where: { projectId: lock.product.projectId }
+        });
+        if (!plan) {
+          plan = await tx.paymentPlan.findFirst();
+        }
+        if (!plan) {
+          plan = await tx.paymentPlan.create({
+            data: {
+              projectId: lock.product.projectId,
+              code: 'STD-DEFAULT',
+              name: 'Thanh toán chuẩn theo tiến độ'
+            }
+          });
+        }
+
+        const contractCount = await tx.contract.count();
+        const rand = Math.floor(Math.random() * 8999 + 1000);
+        const contractNumber = `HĐMB-AHS-${lock.product.productCode.replace(/[^a-zA-Z0-9]/g, '')}-${now.getFullYear()}-${rand}`;
+
+        await tx.contract.create({
+          data: {
+            contractNumber,
+            productId: lock.productId,
+            customerId: customer.id,
+            lockId: lock.id,
+            salesEmployeeId: lock.salesEmployeeId,
+            paymentPlanId: plan.id,
+            agreedPrice: price,
+            dealRevenue: price,
+            status: 'SIGNED',
+            signingStatus: 'DA_KY',
+            signedDate: now,
+            signedAt: now,
+            commissionStatus: 'DU_KIEN_TRA',
+            commissionDueDate: '25/10/2026',
+            commissionAmount: commission,
+            investorContractNo: contractNumber,
+            investorNotes: `Hợp đồng tự động hoàn tất khi Sales Admin xác nhận nhận tiền cọc cho căn ${lock.product.productCode}`,
+            maHopdong: String(202600 + contractCount + 1),
+            maKH: String(1000 + contractCount + 1),
+            sodienthoaiKH: customer.phone,
+            cccdKH: customer.cccdHash,
+            emailKH: customer.email,
+            diachiKH: 'Hà Nội',
+            hotenKH: customer.fullName,
+            phuonganthanhtoan: plan.name,
+            giahopdong: price,
+            thoigiankiHDMB: now,
+            trangthaiHDMB: 'DA_KY',
+            doanhso: price,
+            hoahong: commission,
+            trangthaiThanhtoan: 'DU_KIEN_TRA',
+            ghichu: `Giao dịch cọc thành công qua Sales Admin: ${actorName}`
+          }
+        });
+      }
+
       return { lock: updatedLock, product: updatedProduct };
     });
 
-    // 5. Create Audit Log
+    // 6. Create Audit Log
     await createAuditLog({
       actorId,
       actorName,

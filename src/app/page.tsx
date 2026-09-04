@@ -13,9 +13,11 @@ import { AuditTrail } from '@/components/AuditTrail';
 import { ImportModal } from '@/components/ImportModal';
 import { PersonalRevenueView } from '@/components/PersonalRevenueView';
 import { VietQRModal } from '@/components/VietQRModal';
+import { broadcastSync, onSync } from '@/lib/sync';
 
 export default function Home() {
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<TabType>('inventory');
 
   // Application Data States
@@ -31,6 +33,20 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [activeLockModal, setActiveLockModal] = useState<any | null>(null);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('');
+
+  // Fetch Current User based on Role
+  const fetchCurrentUser = useCallback(async (role: UserRole) => {
+    try {
+      const res = await fetch(`/api/v1/auth/me?role=${role}`);
+      const data = await res.json();
+      if (data.data) {
+        setCurrentUser(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch current user', err);
+    }
+  }, []);
 
   // Fetch Projects
   const fetchProjects = async () => {
@@ -120,7 +136,7 @@ export default function Home() {
     }
   };
 
-  // Refresh all state
+  // Master refresh all states
   const refreshAllData = useCallback(() => {
     fetchProducts();
     fetchLocks();
@@ -128,35 +144,67 @@ export default function Home() {
     fetchContracts();
     fetchReportData();
     fetchAuditLogs();
+    setLastSyncTime(new Date().toLocaleTimeString('vi-VN'));
   }, [fetchProducts]);
 
+  // 1. Initial boot
   useEffect(() => {
     fetchProjects();
-  }, []);
+    fetchCurrentUser(currentRole);
+  }, [fetchCurrentUser, currentRole]);
 
   useEffect(() => {
     refreshAllData();
   }, [selectedProjectId, refreshAllData]);
 
-  // Real-time polling sweep every 5 seconds
+  // 2. Realtime Synchronization via BroadcastChannel & LocalStorage across ALL tabs/windows
+  useEffect(() => {
+    const unsubscribe = onSync((msg) => {
+      refreshAllData();
+    });
+    return () => unsubscribe();
+  }, [refreshAllData]);
+
+  // 3. Tab visibility / Window focus instant auto-refresh
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        refreshAllData();
+      }
+    };
+    const handleFocus = () => {
+      refreshAllData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refreshAllData]);
+
+  // 4. Background Polling Sweep every 3 seconds for continuous live data
   useEffect(() => {
     const interval = setInterval(() => {
-      fetchProducts();
-      fetchLocks();
-    }, 5000);
+      refreshAllData();
+    }, 3000);
     return () => clearInterval(interval);
-  }, [fetchProducts]);
+  }, [refreshAllData]);
 
   // Action: Lock product 30m
   const handleLockProduct = async (productId: string) => {
     try {
+      const salesId = currentUser?.id || 'c9c46059-fd48-4132-b1ad-5fe1d2f3a1ea';
+      const salesName = currentUser?.fullName || 'Nguyễn Minh Khôi';
+
       const res = await fetch('/api/v1/locks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId,
-          salesEmployeeId: 'emp_sales_01',
-          salesEmployeeName: 'Trần Văn Nam'
+          salesEmployeeId: salesId,
+          salesEmployeeName: salesName
         })
       });
 
@@ -167,6 +215,7 @@ export default function Home() {
       }
 
       refreshAllData();
+      broadcastSync('LOCK_UPDATED');
       setActiveLockModal(data.data?.lock || data.data);
     } catch (err: any) {
       alert(err.message);
@@ -183,6 +232,7 @@ export default function Home() {
       });
       if (res.ok) {
         refreshAllData();
+        broadcastSync('LOCK_UPDATED');
       }
     } catch (err) {
       console.error(err);
@@ -200,6 +250,9 @@ export default function Home() {
 
   const handleRoleChange = (role: UserRole) => {
     setCurrentRole(role);
+    fetchCurrentUser(role);
+    refreshAllData();
+
     if (role === 'PRODUCT_ADMIN') {
       if (activeTab === 'customers' || activeTab === 'transactions_revenue' || activeTab === 'contracts' || activeTab === 'audit') {
         setActiveTab('inventory');
@@ -215,6 +268,11 @@ export default function Home() {
     }
   };
 
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    refreshAllData();
+  };
+
   const currentProject = projects.find(p => p.id === selectedProjectId);
 
   return (
@@ -228,7 +286,7 @@ export default function Home() {
       <div className="flex-1 flex overflow-hidden">
         <Sidebar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
           currentRole={currentRole}
           activeLocksCount={activeLocksCount}
           pendingVerificationsCount={pendingVerificationsCount}
@@ -255,6 +313,7 @@ export default function Home() {
               locks={locks}
               contracts={contracts}
               reportData={reportData}
+              currentEmployee={currentUser}
             />
           )}
 
@@ -310,6 +369,7 @@ export default function Home() {
           onClose={() => setActiveLockModal(null)}
           onPaymentSuccess={() => {
             refreshAllData();
+            broadcastSync('ALL_DATA_UPDATED');
           }}
           onProceedToCustomer={() => {
             setActiveLockModal(null);
@@ -326,6 +386,7 @@ export default function Home() {
         onSuccess={() => {
           setIsImportModalOpen(false);
           refreshAllData();
+          broadcastSync('ALL_DATA_UPDATED');
         }}
       />
     </div>

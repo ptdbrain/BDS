@@ -27,6 +27,7 @@ import {
 
 import { ProjectInfoView } from '@/components/ProjectInfoView';
 import { AddProductModal } from '@/components/AddProductModal';
+import { broadcastSync } from '@/lib/sync';
 
 interface InventoryMatrixProps {
   products: any[];
@@ -130,6 +131,8 @@ export function InventoryMatrix({
         notes: 'Nguyện vọng căn 2PN tầng trung ban công Đông Nam'
       });
       fetchBookings();
+      onRefresh();
+      broadcastSync('BOOKING_UPDATED');
     } catch (err: any) {
       setBookingError(err.message);
     } finally {
@@ -860,7 +863,10 @@ export function InventoryMatrix({
         projectId={selectedProjectId}
         isOpen={isAddProductModalOpen}
         onClose={() => setIsAddProductModalOpen(false)}
-        onSuccess={onRefresh}
+        onSuccess={() => {
+          onRefresh();
+          broadcastSync('PRODUCT_UPDATED');
+        }}
       />
 
       {/* REGISTER BOOKING MODAL (CLASS DIAGRAM: BOOKING) */}

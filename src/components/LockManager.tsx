@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Eye
 } from 'lucide-react';
+import { broadcastSync } from '@/lib/sync';
 
 interface LockManagerProps {
   locks: any[];
@@ -113,6 +114,7 @@ export function LockManager({
       const data = await res.json();
       setSimulationResult(data);
       onRefresh();
+      broadcastSync('ALL_DATA_UPDATED');
     } catch (err: any) {
       setSimulationResult({ error: err.message });
     } finally {
@@ -120,13 +122,12 @@ export function LockManager({
     }
   };
 
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
   // Sales Admin confirms transfer received -> converts product status to SOLD directly
   const handleAdminConfirmTransfer = async (lockId: string) => {
-    if (!confirm('Xác nhận đã nhận chuyển khoản cọc cho căn này?\nHệ thống sẽ chuyển trạng thái căn từ Lock sang ĐÃ BÁN.')) {
-      return;
-    }
-
     setIsConfirmingTransfer(lockId);
+    setActionSuccessMsg(null);
     try {
       const res = await fetch(`/api/v1/locks/${lockId}/confirm-transfer`, {
         method: 'POST',
@@ -144,8 +145,9 @@ export function LockManager({
         return;
       }
 
-      alert(data.message || 'Xác nhận thành công! Căn đã chuyển trạng thái sang ĐÃ BÁN.');
+      setActionSuccessMsg(data.message || 'Xác nhận thành công! Căn đã chuyển trạng thái sang ĐÃ BÁN.');
       onRefresh();
+      broadcastSync('ALL_DATA_UPDATED');
     } catch (err: any) {
       alert(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -203,6 +205,21 @@ export function LockManager({
           </button>
         </div>
       </div>
+
+      {actionSuccessMsg && (
+        <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-500/50 flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center space-x-3 text-emerald-300 text-xs font-bold">
+            <CheckCircle className="w-5 h-5 text-emerald-400" />
+            <span>{actionSuccessMsg}</span>
+          </div>
+          <button
+            onClick={() => setActionSuccessMsg(null)}
+            className="text-emerald-400 hover:text-white text-xs px-2 py-1 rounded-lg"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ACTIVE LOCKS SECTION */}
       <div className="space-y-4">

@@ -97,6 +97,17 @@ export async function PUT(
       }
     });
 
+    // If signed, transition product to SOLD immediately
+    if (updated.status === 'SIGNED' || updated.signingStatus === 'DA_KY') {
+      await db.product.update({
+        where: { id: updated.productId },
+        data: {
+          status: 'SOLD',
+          trangthai: 'Đã bán'
+        }
+      });
+    }
+
     await createAuditLog({
       actorId,
       actorName,

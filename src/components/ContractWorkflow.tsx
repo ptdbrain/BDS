@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   RotateCcw
 } from 'lucide-react';
+import { broadcastSync } from '@/lib/sync';
 
 interface ContractWorkflowProps {
   contracts: any[];
@@ -172,6 +173,7 @@ export function ContractWorkflow({
 
       setIsInvestorModalOpen(false);
       onRefresh();
+      broadcastSync('ALL_DATA_UPDATED');
     } catch (err: any) {
       setFormError(err.message || 'Lỗi lưu thông tin');
     } finally {

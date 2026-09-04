@@ -24,29 +24,29 @@ export function Navbar({ currentRole, onRoleChange, activeProjectName }: NavbarP
   const rolesConfig: Record<UserRole, { label: string; name: string; title: string; color: string; icon: any }> = {
     SALES: {
       label: 'Nhân Viên Kinh Doanh',
-      name: 'Trần Văn Nam',
-      title: 'Sales Real Estate',
+      name: 'Nguyễn Minh Khôi (NV001)',
+      title: 'Chuyên viên kinh doanh',
       color: 'from-amber-500 to-orange-500',
       icon: UserCheck
     },
     PRODUCT_ADMIN: {
       label: 'Nhân Viên QL Sản Phẩm',
-      name: 'Nguyễn Tiến Dũng',
-      title: 'Inventory Manager',
+      name: 'Nguyễn Thùy Dương (NV009)',
+      title: 'QL Sản Phẩm & Quỹ Hàng',
       color: 'from-blue-500 to-cyan-500',
       icon: Building2
     },
     SALES_ADMIN: {
       label: 'Sales Admin (Kiểm Duyệt)',
-      name: 'Phạm Thị Mai',
+      name: 'Vũ Mai Phương (NV007)',
       title: 'Sales & Legal Admin',
       color: 'from-purple-500 to-indigo-500',
       icon: ShieldCheck
     },
     MANAGER: {
       label: 'Giám Đốc / Ban Báo Cáo',
-      name: 'Hoàng Quốc Việt',
-      title: 'Executive Director',
+      name: 'Trần Gia Bảo (NV010)',
+      title: 'Ban Lãnh Đạo / Quản Lý',
       color: 'from-emerald-500 to-teal-500',
       icon: Zap
     }
@@ -76,8 +76,11 @@ export function Navbar({ currentRole, onRoleChange, activeProjectName }: NavbarP
           </div>
 
           <div className="hidden md:flex items-center space-x-2 pl-6 border-l border-slate-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-            <span className="text-xs font-semibold text-emerald-400">Socket Realtime Active</span>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            </span>
+            <span className="text-xs font-semibold text-emerald-400">Realtime Sync Đang Hoạt Động (Cross-Tab Active)</span>
           </div>
         </div>
 

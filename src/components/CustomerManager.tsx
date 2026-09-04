@@ -24,6 +24,7 @@ import {
   CreditCard,
   MapPin
 } from 'lucide-react';
+import { broadcastSync } from '@/lib/sync';
 
 interface CustomerManagerProps {
   customers: any[];
@@ -124,6 +125,7 @@ export function CustomerManager({
       setEditingCustomerId(null);
       setIsFormOpen(false);
       onRefresh();
+      broadcastSync('CUSTOMER_UPDATED');
     } catch (err: any) {
       setFormError(err.message);
     }

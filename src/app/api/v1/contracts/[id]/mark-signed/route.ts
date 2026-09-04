@@ -36,7 +36,10 @@ export async function POST(
         where: { id: params.id },
         data: {
           status: 'SIGNED',
+          signingStatus: 'DA_KY',
+          signedDate: new Date(),
           signedAt: new Date(),
+          trangthaiHDMB: 'DA_KY',
           version: { increment: 1 }
         }
       });
@@ -46,6 +49,7 @@ export async function POST(
         where: { id: contract.productId },
         data: {
           status: 'SOLD',
+          trangthai: 'Đã bán',
           version: { increment: 1 }
         }
       });

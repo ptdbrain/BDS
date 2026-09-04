@@ -27,6 +27,7 @@ export async function sweepExpiredLocks() {
           where: { id: lock.productId },
           data: {
             status: 'AVAILABLE',
+            trangthai: 'Còn hàng',
             version: { increment: 1 }
           }
         });
@@ -85,7 +86,7 @@ export async function acquireProductLock({
   let validSalesId = salesEmployeeId;
   const empExists = await db.employee.findUnique({ where: { id: salesEmployeeId } });
   if (!empExists) {
-    const defaultEmp = await db.employee.findFirst({ where: { employeeCode: 'NV-SALE-01' } }) || await db.employee.findFirst();
+    const defaultEmp = await db.employee.findFirst({ where: { employeeCode: 'NV001' } }) || await db.employee.findFirst();
     if (defaultEmp) {
       validSalesId = defaultEmp.id;
     }
@@ -112,6 +113,7 @@ export async function acquireProductLock({
         },
         data: {
           status: 'LOCKED',
+          trangthai: 'Đang giữ chỗ',
           version: { increment: 1 }
         }
       });
