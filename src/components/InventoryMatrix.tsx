@@ -788,30 +788,7 @@ export function InventoryMatrix({
               </div>
             </div>
 
-            {/* Pricing table from DB */}
-            <div>
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Chi Tiết Phương Án & Tiền Cọc</h4>
-              <div className="rounded-xl border border-slate-800 overflow-hidden">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-900 text-slate-400 font-bold">
-                    <tr>
-                      <th className="p-3">Phương Án Thanh Toán</th>
-                      <th className="p-3">Giá Bán</th>
-                      <th className="p-3">Tiền Cọc Quy Định</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 text-slate-200">
-                    {selectedProduct.prices?.map((pr: any) => (
-                      <tr key={pr.id}>
-                        <td className="p-3 font-semibold">{pr.paymentPlan?.name || 'Tiến độ chuẩn'}</td>
-                        <td className="p-3 font-bold text-brand-400">{Number(pr.amount).toLocaleString('vi-VN')} VND</td>
-                        <td className="p-3 font-bold text-emerald-400">{Number(pr.depositAmount).toLocaleString('vi-VN')} VND</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+
 
             {/* Status history timeline */}
             {selectedProduct.history?.length > 0 && (
