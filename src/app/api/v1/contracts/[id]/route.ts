@@ -50,13 +50,34 @@ export async function PUT(
 
     const dataToUpdate: any = {};
     if (investorContractNo !== undefined) dataToUpdate.investorContractNo = investorContractNo;
-    if (signedDate !== undefined) dataToUpdate.signedDate = signedDate ? new Date(signedDate) : null;
-    if (signingStatus !== undefined) dataToUpdate.signingStatus = signingStatus;
-    if (dealRevenue !== undefined) dataToUpdate.dealRevenue = parseFloat(String(dealRevenue));
-    if (commissionStatus !== undefined) dataToUpdate.commissionStatus = commissionStatus;
+    if (signedDate !== undefined) {
+      dataToUpdate.signedDate = signedDate ? new Date(signedDate) : null;
+      dataToUpdate.thoigiankiHDMB = signedDate ? new Date(signedDate) : null;
+    }
+    if (signingStatus !== undefined) {
+      dataToUpdate.signingStatus = signingStatus;
+      dataToUpdate.trangthaiHDMB = signingStatus;
+    }
+    if (dealRevenue !== undefined) {
+      const numRevenue = parseFloat(String(dealRevenue));
+      dataToUpdate.dealRevenue = numRevenue;
+      dataToUpdate.giahopdong = numRevenue;
+      dataToUpdate.doanhso = numRevenue;
+    }
+    if (commissionStatus !== undefined) {
+      dataToUpdate.commissionStatus = commissionStatus;
+      dataToUpdate.trangthaiThanhtoan = commissionStatus;
+    }
     if (commissionDueDate !== undefined) dataToUpdate.commissionDueDate = commissionDueDate;
-    if (commissionAmount !== undefined) dataToUpdate.commissionAmount = parseFloat(String(commissionAmount));
-    if (investorNotes !== undefined) dataToUpdate.investorNotes = investorNotes;
+    if (commissionAmount !== undefined) {
+      const numComm = parseFloat(String(commissionAmount));
+      dataToUpdate.commissionAmount = numComm;
+      dataToUpdate.hoahong = numComm;
+    }
+    if (investorNotes !== undefined) {
+      dataToUpdate.investorNotes = investorNotes;
+      dataToUpdate.ghichu = investorNotes;
+    }
     if (status !== undefined) dataToUpdate.status = status;
 
     // If signingStatus is DA_KY, ensure status is SIGNED and signedAt is set

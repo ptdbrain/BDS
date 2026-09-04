@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserRole } from '@/lib/types';
 import {
   Grid,
@@ -18,7 +18,11 @@ import {
   ChevronRight,
   RefreshCw,
   Sparkles,
-  PlusCircle
+  PlusCircle,
+  Calendar,
+  Clock,
+  User,
+  Phone
 } from 'lucide-react';
 
 import { ProjectInfoView } from '@/components/ProjectInfoView';
@@ -55,8 +59,83 @@ export function InventoryMatrix({
   const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState<boolean>(false);
 
+  // Booking states (Class Diagram: Booking)
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [isLoadingBookings, setIsLoadingBookings] = useState<boolean>(false);
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
+  const [bookingFormData, setBookingFormData] = useState({
+    customerName: '',
+    customerPhone: '',
+    depositAmount: '50000000',
+    notes: 'Nguyện vọng căn 2PN tầng trung ban công Đông Nam'
+  });
+  const [bookingError, setBookingError] = useState<string | null>(null);
+  const [isSubmittingBooking, setIsSubmittingBooking] = useState<boolean>(false);
+
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const isProjectUnreleased = selectedProject?.status === 'UPCOMING';
+
+  const fetchBookings = async () => {
+    if (!selectedProjectId) return;
+    setIsLoadingBookings(true);
+    try {
+      const res = await fetch(`/api/v1/bookings?projectId=${selectedProjectId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBookings(data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching bookings:', err);
+    } finally {
+      setIsLoadingBookings(false);
+    }
+  };
+
+  useEffect(() => {
+    if (projectSubTab === 'booking' || isProjectUnreleased) {
+      fetchBookings();
+    }
+  }, [selectedProjectId, projectSubTab]);
+
+  const handleCreateBooking = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingFormData.customerName || !bookingFormData.customerPhone) {
+      setBookingError('Vui lòng nhập họ tên và số điện thoại khách hàng!');
+      return;
+    }
+    setIsSubmittingBooking(true);
+    setBookingError(null);
+    try {
+      const res = await fetch('/api/v1/bookings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          customerName: bookingFormData.customerName,
+          customerPhone: bookingFormData.customerPhone,
+          depositAmount: parseFloat(bookingFormData.depositAmount),
+          notes: bookingFormData.notes,
+          salesEmployeeId: 'emp_sales_01'
+        })
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || 'Đăng ký booking thất bại');
+      }
+      setIsBookingModalOpen(false);
+      setBookingFormData({
+        customerName: '',
+        customerPhone: '',
+        depositAmount: '50000000',
+        notes: 'Nguyện vọng căn 2PN tầng trung ban công Đông Nam'
+      });
+      fetchBookings();
+    } catch (err: any) {
+      setBookingError(err.message);
+    } finally {
+      setIsSubmittingBooking(false);
+    }
+  };
 
   // Buildings list
   const buildings = Array.from(new Set(products.map(p => p.building)));
@@ -85,12 +164,16 @@ export function InventoryMatrix({
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'AVAILABLE':
+      case 'Còn hàng':
         return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn Hàng</span>;
       case 'LOCKED':
+      case 'Đã khớp':
         return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang Lock 30m</span>;
       case 'DEPOSITED':
+      case 'Check Admin':
         return <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã Cọc</span>;
       case 'SOLD':
+      case 'Đã bán':
         return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã Bán</span>;
       default:
         return <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">Tạm Ngưng</span>;
@@ -255,19 +338,22 @@ export function InventoryMatrix({
             <span>2. Quỹ Hàng (Bảng Hàng)</span>
           </button>
 
-          {isProjectUnreleased && (
-            <button
-              onClick={() => setProjectSubTab('booking')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
-                projectSubTab === 'booking'
-                  ? 'bg-amber-600 text-white shadow-md'
-                  : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>3. Bảng Booking</span>
-            </button>
-          )}
+          <button
+            onClick={() => setProjectSubTab('booking')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center space-x-2 ${
+              projectSubTab === 'booking'
+                ? 'bg-amber-600 text-white shadow-md'
+                : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-amber-300" />
+            <span>3. Bảng Booking</span>
+            {isProjectUnreleased && (
+              <span className="text-[9px] bg-amber-400/20 text-amber-300 px-1.5 py-0.5 rounded-full uppercase font-mono">
+                Mới
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
@@ -275,16 +361,157 @@ export function InventoryMatrix({
       {projectSubTab === 'info' ? (
         <ProjectInfoView project={selectedProject} currentRole={currentRole} onRefresh={onRefresh} />
       ) : projectSubTab === 'booking' ? (
-        <div className="glass-panel p-8 text-center rounded-2xl border border-slate-800 space-y-3">
-          <Sparkles className="w-10 h-10 text-amber-400 mx-auto animate-bounce" />
-          <h3 className="text-base font-bold text-white">Bảng Giữ Chỗ / Booking Dự Án Chưa Ra Hàng</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Dự án <strong>{selectedProject?.name}</strong> hiện đang tiếp nhận Booking ưu tiên đợt 1. Quỹ hàng chính thức sẽ mở khóa khi chủ đầu tư công bố ngày mở bán.
-          </p>
-          <div className="pt-3">
-            <span className="px-4 py-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold">
-              Tiền Booking giữ chỗ: 50.000.000 VND / Suất
-            </span>
+        <div className="space-y-6">
+          {/* Header & Controls */}
+          <div className="glass-panel p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white flex items-center space-x-2">
+                    <span>Bảng Quản Lý Booking & Khớp Căn</span>
+                    <span className="text-xs font-mono text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+                      [Class: Booking]
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Theo dõi số thứ tự Booking (STTBooking), thời gian bắt đầu & kết thúc khớp căn, trạng thái khớp căn theo thời gian thực.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={fetchBookings}
+                className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white"
+                title="Tải lại dữ liệu booking"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingBookings ? 'animate-spin text-amber-400' : ''}`} />
+              </button>
+              <button
+                onClick={() => setIsBookingModalOpen(true)}
+                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black uppercase flex items-center space-x-2 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
+              >
+                <PlusCircle className="w-4 h-4" />
+                <span>+ Đăng Ký Lượt Booking</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Booking KPI Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="glass-panel p-4 rounded-xl border border-slate-800">
+              <span className="text-[11px] text-slate-400 font-semibold uppercase">Tổng Số Lượt Booking</span>
+              <div className="text-2xl font-black text-white mt-1">{bookings.length}</div>
+              <span className="text-[10px] text-slate-500">Toàn bộ khách hàng đặt chỗ</span>
+            </div>
+            <div className="glass-panel p-4 rounded-xl border border-amber-500/30 bg-amber-950/10">
+              <span className="text-[11px] text-amber-400 font-semibold uppercase">Đang Chờ Khớp Căn</span>
+              <div className="text-2xl font-black text-amber-400 mt-1">
+                {bookings.filter(b => b.trangthaikhopcan === 'CHO_KHOP' || b.trangthaikhopcan === 'Chưa khớp').length}
+              </div>
+              <span className="text-[10px] text-amber-400/70">Ưu tiên theo số thứ tự STTBooking</span>
+            </div>
+            <div className="glass-panel p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/10">
+              <span className="text-[11px] text-emerald-400 font-semibold uppercase">Đã Khớp Căn Thành Công</span>
+              <div className="text-2xl font-black text-emerald-400 mt-1">
+                {bookings.filter(b => b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp').length}
+              </div>
+              <span className="text-[10px] text-emerald-400/70">Chuyển sang bước cọc / hợp đồng</span>
+            </div>
+          </div>
+
+          {/* Booking Table */}
+          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center space-x-2">
+                <span>Danh Sách Lượt Booking Dự Án</span>
+                <span className="text-[11px] text-slate-500 font-normal">({bookings.length} lượt đăng ký)</span>
+              </h4>
+              <span className="text-[11px] text-amber-400 font-semibold">
+                Mức cọc chuẩn: 50.000.000 VND / Booking
+              </span>
+            </div>
+
+            {isLoadingBookings ? (
+              <div className="p-12 text-center text-slate-400 text-xs">Đang tải danh sách Booking...</div>
+            ) : bookings.length === 0 ? (
+              <div className="p-12 text-center space-y-3">
+                <Sparkles className="w-8 h-8 text-amber-400/50 mx-auto" />
+                <p className="text-sm font-bold text-slate-300">Chưa có lượt Booking nào cho dự án này</p>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  Nhấn nút "+ Đăng Ký Lượt Booking" phía trên để tạo lượt booking giữ chỗ mới cho khách hàng.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
+                    <tr>
+                      <th className="p-3.5">STT [STTBooking]</th>
+                      <th className="p-3.5">Mã Booking [MaLuotBooking]</th>
+                      <th className="p-3.5">Khách Hàng</th>
+                      <th className="p-3.5">Thời Gian Booking [TGBooking]</th>
+                      <th className="p-3.5">TG Khớp Căn [TGbatdau - TGketthuc]</th>
+                      <th className="p-3.5">Số Tiền Giữ Chỗ</th>
+                      <th className="p-3.5">Trạng Thái [Trangthaikhopcan]</th>
+                      <th className="p-3.5">Nhân Viên Phụ Trách</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800 text-slate-200">
+                    {bookings.map((b: any) => (
+                      <tr key={b.id} className="hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 font-mono font-black text-amber-400">
+                          #{String(b.sttBooking).padStart(3, '0')}
+                        </td>
+                        <td className="p-3.5 font-mono font-bold text-white">
+                          {b.maLuotBooking}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="font-semibold text-white">{b.customerName || 'Khách hàng'}</div>
+                          <div className="text-[11px] text-slate-400">{b.customerPhone}</div>
+                        </td>
+                        <td className="p-3.5 text-slate-300">
+                          {new Date(b.tgBooking).toLocaleString('vi-VN')}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="text-[11px] text-emerald-400">
+                            Bắt đầu: {b.tgBatdaukhop ? new Date(b.tgBatdaukhop).toLocaleDateString('vi-VN') : 'Khi mở bán'}
+                          </div>
+                          <div className="text-[11px] text-rose-400">
+                            Kết thúc: {b.tgKetthuckhopcan ? new Date(b.tgKetthuckhopcan).toLocaleDateString('vi-VN') : 'Sau 3 ngày'}
+                          </div>
+                        </td>
+                        <td className="p-3.5 font-bold text-brand-400">
+                          {Number(b.depositAmount || 50000000).toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                            b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp'
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                              : b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
+                              : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                          }`}>
+                            {b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp'
+                              ? 'Đã Khớp Căn'
+                              : b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian'
+                              ? 'Hết Thời Gian'
+                              : 'Chờ Khớp Căn'}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-slate-400">
+                          {b.salesEmployee?.fullName || 'Nguyễn Văn Nam (Sales)'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -497,36 +724,77 @@ export function InventoryMatrix({
               </button>
             </div>
 
-            {/* Spec grid */}
+            {/* Spec grid (Sanpham Class Diagram Fields) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
               <div>
-                <span className="text-[11px] text-slate-400 block">Diện tích thông thủy</span>
-                <span className="text-sm font-bold text-white">{selectedProduct.area} m²</span>
+                <span className="text-[11px] text-slate-400 block">Mã căn [MaCan]</span>
+                <span className="text-sm font-bold text-white">{selectedProduct.maCan || selectedProduct.productCode}</span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 block">Hướng ban công</span>
-                <span className="text-sm font-bold text-white">{selectedProduct.direction}</span>
+                <span className="text-[11px] text-slate-400 block">Diện tích [Dientich]</span>
+                <span className="text-sm font-bold text-white">{selectedProduct.dientich || selectedProduct.area} m²</span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 block">Gói bàn giao</span>
-                <span className="text-sm font-bold text-white">{selectedProduct.handoverPlan}</span>
+                <span className="text-[11px] text-slate-400 block">Hướng [Huong]</span>
+                <span className="text-sm font-bold text-white">{selectedProduct.huong || selectedProduct.direction}</span>
               </div>
               <div>
-                <span className="text-[11px] text-slate-400 block">Tiền cọc niêm yết</span>
-                <span className="text-sm font-bold text-brand-400">100.000.000 VND</span>
+                <span className="text-[11px] text-slate-400 block">Trạng thái [Trangthai]</span>
+                <span className="text-sm font-bold text-emerald-400">{selectedProduct.trangthai || selectedProduct.status}</span>
               </div>
             </div>
 
-            {/* Pricing table */}
+            {/* 4 Pricing Tiers as per Class Diagram: Gianiemyet, GiaTTS, GiaTTC, GiaVay */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                <span>Bảng Giá Theo 3 Phương Án (Sơ đồ lớp Sản Phẩm)</span>
+                <span className="text-[10px] text-brand-400 font-mono">MaCan: {selectedProduct.productCode}</span>
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-slate-900 border border-slate-800">
+                  <div className="text-[11px] text-slate-400 font-medium">1. Giá Niêm Yết</div>
+                  <div className="text-sm font-black text-brand-400 mt-1">
+                    {Number(selectedProduct.gianiemyet || selectedProduct.prices?.[0]?.amount || 4800000000).toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">[Gianiemyet]</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                  <div className="text-[11px] text-amber-400 font-medium">2. Giá TT Sớm (-10%)</div>
+                  <div className="text-sm font-black text-amber-300 mt-1">
+                    {Number(selectedProduct.giaTTS || ((selectedProduct.gianiemyet || selectedProduct.prices?.[0]?.amount || 4800000000) * 0.90)).toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[10px] text-amber-500/70 mt-0.5">[GiaTTS]</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-blue-950/20 border border-blue-500/30">
+                  <div className="text-[11px] text-blue-400 font-medium">3. Giá TT Chuẩn</div>
+                  <div className="text-sm font-black text-blue-300 mt-1">
+                    {Number(selectedProduct.giaTTC || (selectedProduct.gianiemyet || selectedProduct.prices?.[0]?.amount || 4800000000)).toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[10px] text-blue-500/70 mt-0.5">[GiaTTC]</div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
+                  <div className="text-[11px] text-emerald-400 font-medium">4. Giá Vay Ngân Hàng</div>
+                  <div className="text-sm font-black text-emerald-300 mt-1">
+                    {Number(selectedProduct.giaVay || ((selectedProduct.gianiemyet || selectedProduct.prices?.[0]?.amount || 4800000000) * 1.02)).toLocaleString('vi-VN')} đ
+                  </div>
+                  <div className="text-[10px] text-emerald-500/70 mt-0.5">[GiaVay]</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Pricing table from DB */}
             <div>
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Bảng Giá Theo Phương Án Thanh Toán</h4>
+              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Chi Tiết Phương Án & Tiền Cọc</h4>
               <div className="rounded-xl border border-slate-800 overflow-hidden">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-slate-900 text-slate-400 font-bold">
                     <tr>
                       <th className="p-3">Phương Án Thanh Toán</th>
-                      <th className="p-3">Giá Niêm Yết</th>
-                      <th className="p-3">Tiền Cọc</th>
+                      <th className="p-3">Giá Bán</th>
+                      <th className="p-3">Tiền Cọc Quy Định</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 text-slate-200">
@@ -586,6 +854,7 @@ export function InventoryMatrix({
           </div>
         </div>
       )}
+
       {/* ADD PRODUCT MODAL (INDIVIDUAL FIELDS) */}
       <AddProductModal
         projectId={selectedProjectId}
@@ -593,6 +862,114 @@ export function InventoryMatrix({
         onClose={() => setIsAddProductModalOpen(false)}
         onSuccess={onRefresh}
       />
+
+      {/* REGISTER BOOKING MODAL (CLASS DIAGRAM: BOOKING) */}
+      {isBookingModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="glass-panel w-full max-w-lg rounded-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white">Đăng Ký Suất Booking Ưu Tiên</h3>
+                  <p className="text-xs text-slate-400">Dự án: {selectedProject?.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsBookingModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {bookingError && (
+              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-xs">
+                {bookingError}
+              </div>
+            )}
+
+            <form onSubmit={handleCreateBooking} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Họ và Tên Khách Hàng (*)</label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Nguyễn Tuấn Anh"
+                    value={bookingFormData.customerName}
+                    onChange={(e) => setBookingFormData({ ...bookingFormData, customerName: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 text-white pl-9 pr-3 py-2.5 rounded-xl outline-none focus:border-amber-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Số Điện Thoại Khách Hàng (*)</label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="tel"
+                    required
+                    placeholder="VD: 0912345678"
+                    value={bookingFormData.customerPhone}
+                    onChange={(e) => setBookingFormData({ ...bookingFormData, customerPhone: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 text-white pl-9 pr-3 py-2.5 rounded-xl outline-none focus:border-amber-500 font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Số Tiền Giữ Chỗ / Booking (VND)</label>
+                <div className="relative">
+                  <DollarSign className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="number"
+                    step="1000000"
+                    value={bookingFormData.depositAmount}
+                    onChange={(e) => setBookingFormData({ ...bookingFormData, depositAmount: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 text-white pl-9 pr-3 py-2.5 rounded-xl outline-none focus:border-amber-500 font-bold text-amber-400"
+                  />
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">
+                  Mức booking chuẩn theo quy định CĐT: 50.000.000 VND (Hoàn lại 100% nếu không khớp căn)
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Ghi Chú Nguyện Vọng Căn</label>
+                <textarea
+                  rows={2}
+                  placeholder="VD: Ưu tiên căn góc tầng 10 - 20 hướng Đông Nam"
+                  value={bookingFormData.notes}
+                  onChange={(e) => setBookingFormData({ ...bookingFormData, notes: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsBookingModalOpen(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingBooking}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black uppercase shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
+                >
+                  {isSubmittingBooking ? 'Đang tạo...' : 'Xác Nhận Booking'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

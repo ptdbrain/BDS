@@ -11,6 +11,8 @@ model Investor {
   id          String    @id @default(uuid())
   code        String    @unique
   name        String
+  maCDT       String?
+  tenCDT      String?
   status      String    @default("ACTIVE") // ACTIVE, INACTIVE
   contactInfo String?
   createdAt   DateTime  @default(now())
@@ -25,6 +27,10 @@ model Project {
   code                String        @unique
   name                String
   location            String
+  maDA                String?
+  tenDA               String?
+  trangthaiDA         String?
+  diadiem             String?
   status              String        @default("UPCOMING") // UPCOMING, SELLING, COMPLETED, CLOSED
   lockDurationMinutes Int           @default(30)
   saleOpenAt          DateTime?
@@ -34,12 +40,15 @@ model Project {
   updatedAt           DateTime      @updatedAt
   products            Product[]
   paymentPlans        PaymentPlan[]
+  bookings            Booking[]
 }
 
 model ProductType {
   id             String    @id @default(uuid())
   code           String    @unique
   name           String    // Căn hộ, Shophouse, Biệt thự, Duplex, Penthouse
+  maLoaisanpham  String?
+  loaiSanpham    String?
   metadataSchema String?   // JSON configuration for extra fields
   products       Product[]
 }
@@ -69,6 +78,17 @@ model Product {
   direction     String                 // Đông Nam, Tây Bắc, etc.
   handoverPlan  String                 // Bàn giao thô, Bàn giao hoàn thiện
   status        String                 @default("AVAILABLE") // AVAILABLE, LOCKED, DEPOSITED, SOLD, UNAVAILABLE
+  
+  // Class Diagram fields (Sanpham)
+  maCan         String?
+  dientich      Float?
+  huong         String?
+  gianiemyet    Float?
+  giaTTS        Float?                 // Giá Thanh Toán Sớm 95%
+  giaTTC        Float?                 // Giá Thanh Toán Chuẩn tiến độ
+  giaVay        Float?                 // Giá Vay ngân hàng HTLS
+  trangthai     String?
+
   version       Int                    @default(1)
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
@@ -94,11 +114,13 @@ model ProductPrice {
 }
 
 model Department {
-  id        String     @id @default(uuid())
-  code      String     @unique
-  name      String
-  parentId  String?
-  employees Employee[]
+  id          String     @id @default(uuid())
+  code        String     @unique
+  name        String
+  maPhongban  String?
+  tenphongban String?
+  parentId    String?
+  employees   Employee[]
 }
 
 model Employee {
@@ -110,12 +132,40 @@ model Employee {
   departmentId           String
   department             Department             @relation(fields: [departmentId], references: [id])
   jobTitle               String                 // Sales, Product Admin, Sales Admin, Manager
+  
+  // Class Diagram fields (Nhanvien)
+  maNV                   String?
+  chucvu                 String?
+  sodienthoaiNV          String?
+  hotenNV                String?
+
   status                 String                 @default("ACTIVE")
   locks                  ProductLock[]
   contracts              Contract[]
+  bookings               Booking[]
   customerVerifications1 CustomerVerification[] @relation("SubmittedBy")
   customerVerifications2 CustomerVerification[] @relation("ReviewedBy")
   contractReviews        ContractReview[]
+}
+
+model Booking {
+  id               String    @id @default(uuid())
+  maLuotBooking    String    @unique
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id])
+  salesEmployeeId  String
+  salesEmployee    Employee  @relation(fields: [salesEmployeeId], references: [id])
+  tgBooking        DateTime  @default(now())
+  sttBooking       Int
+  tgBatdaukhop     DateTime?
+  tgKetthuckhopcan DateTime?
+  trangthaikhopcan String    @default("CHO_KHOP") // CHO_KHOP, DA_KHOP, HUY
+  customerName     String?
+  customerPhone    String?
+  depositAmount    Float?    @default(50000000)
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 }
 
 model ProductLock {
@@ -130,6 +180,16 @@ model ProductLock {
   depositConfirmedAt DateTime?
   cancelReason       String?
   idempotencyKey     String?              @unique
+  
+  // Class Diagram fields (Luotlock)
+  maLock             String?
+  thoigianbatdau     DateTime?
+  thoigianketthuc    DateTime?
+  sotiencoc          Float?
+  trangthaigiaodich  String?
+  thoigiancoc        DateTime?
+  ghichu             String?
+
   version            Int                  @default(1)
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
@@ -199,34 +259,52 @@ model CustomerVerification {
 }
 
 model Contract {
-  id              String           @id @default(uuid())
-  contractNumber  String           @unique
-  productId       String
-  product         Product          @relation(fields: [productId], references: [id])
-  customerId      String
-  customer        Customer         @relation(fields: [customerId], references: [id])
-  lockId          String?
-  lock            ProductLock?     @relation(fields: [lockId], references: [id])
-  salesEmployeeId String
-  salesEmployee   Employee         @relation(fields: [salesEmployeeId], references: [id])
-  paymentPlanId   String
-  paymentPlan     PaymentPlan      @relation(fields: [paymentPlanId], references: [id])
-  agreedPrice     Float
-  status              String           @default("DRAFT") // DRAFT, PENDING_REVIEW, CHANGE_REQUESTED, APPROVED, REJECTED, SIGNED, CANCELLED
-  signingStatus       String?          @default("CHUA_KY") // CHUA_KY, DA_KY, CHAM_KY
-  signedDate          DateTime?
-  dealRevenue         Float?
-  commissionStatus    String?          @default("DU_KIEN_TRA") // DA_TRA, DU_KIEN_TRA
-  commissionDueDate   String?          // dd/mm/yyyy
-  commissionAmount    Float?
-  investorContractNo  String?
-  investorNotes       String?
-  snapshotJson        String?          // Full snapshot of prices, customer, product state
-  signedAt            DateTime?
-  version             Int              @default(1)
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
-  reviews         ContractReview[]
+  id                 String           @id @default(uuid())
+  contractNumber     String           @unique
+  productId          String
+  product            Product          @relation(fields: [productId], references: [id])
+  customerId         String
+  customer           Customer         @relation(fields: [customerId], references: [id])
+  lockId             String?
+  lock               ProductLock?     @relation(fields: [lockId], references: [id])
+  salesEmployeeId    String
+  salesEmployee      Employee         @relation(fields: [salesEmployeeId], references: [id])
+  paymentPlanId      String
+  paymentPlan        PaymentPlan      @relation(fields: [paymentPlanId], references: [id])
+  agreedPrice        Float
+  status             String           @default("DRAFT") // DRAFT, PENDING_REVIEW, CHANGE_REQUESTED, APPROVED, REJECTED, SIGNED, CANCELLED
+  signingStatus      String?          @default("CHUA_KY") // CHUA_KY, DA_KY, CHAM_KY
+  signedDate         DateTime?
+  dealRevenue        Float?
+  commissionStatus   String?          @default("DU_KIEN_TRA") // DA_TRA, DU_KIEN_TRA
+  commissionDueDate  String?          // dd/mm/yyyy
+  commissionAmount   Float?
+  investorContractNo String?
+  investorNotes      String?
+
+  // Class Diagram fields (Hopdong)
+  maHopdong          String?
+  maKH               String?
+  sodienthoaiKH      String?
+  cccdKH             String?
+  emailKH            String?
+  diachiKH           String?
+  hotenKH            String?
+  phuonganthanhtoan  String?
+  giahopdong         Float?
+  thoigiankiHDMB     DateTime?
+  trangthaiHDMB      String?
+  doanhso            Float?
+  hoahong            Float?
+  trangthaiThanhtoan String?
+  ghichu             String?
+
+  snapshotJson       String?          // Full snapshot of prices, customer, product state
+  signedAt           DateTime?
+  version            Int              @default(1)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  reviews            ContractReview[]
 }
 
 model ContractReview {

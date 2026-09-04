@@ -91,7 +91,11 @@ export async function POST(request: Request) {
       depositAmount = 100000000,
       productTypeId,
       actorId = 'emp_prod_01',
-      actorName = 'Nguyễn Tiến Dũng'
+      actorName = 'Nguyễn Tiến Dũng',
+      gianiemyet,
+      giaTTS,
+      giaTTC,
+      giaVay
     } = body;
 
     if (!projectId || !productCode || !building || floor === undefined || !area || !amount) {
@@ -125,7 +129,7 @@ export async function POST(request: Request) {
 
     if (!resolvedTypeId) {
       const newType = await db.productType.create({
-        data: { code: 'TYPE-APT', name: 'Căn Hộ Cao Cấp' }
+        data: { code: 'TYPE-APT', name: 'Căn Hộ Cao Cấp', loaiSanpham: 'Căn Hộ Cao Cấp' }
       });
       resolvedTypeId = newType.id;
     }
@@ -145,6 +149,12 @@ export async function POST(request: Request) {
       });
     }
 
+    const numAmount = parseFloat(String(amount));
+    const numGiaNiemyet = gianiemyet ? parseFloat(String(gianiemyet)) : numAmount;
+    const numGiaTTS = giaTTS ? parseFloat(String(giaTTS)) : Math.round(numAmount * 0.90);
+    const numGiaTTC = giaTTC ? parseFloat(String(giaTTC)) : numAmount;
+    const numGiaVay = giaVay ? parseFloat(String(giaVay)) : Math.round(numAmount * 1.02);
+
     // Create product and price in a transaction
     const newProduct = await db.$transaction(async (tx) => {
       const prod = await tx.product.create({
@@ -157,7 +167,16 @@ export async function POST(request: Request) {
           area: parseFloat(String(area)),
           direction: direction.trim(),
           handoverPlan: handoverPlan.trim(),
-          status: status || 'AVAILABLE'
+          status: status || 'AVAILABLE',
+          // Class diagram fields (Sanpham)
+          maCan: productCode.trim().toUpperCase(),
+          dientich: parseFloat(String(area)),
+          huong: direction.trim(),
+          gianiemyet: numGiaNiemyet,
+          giaTTS: numGiaTTS,
+          giaTTC: numGiaTTC,
+          giaVay: numGiaVay,
+          trangthai: status || 'AVAILABLE'
         }
       });
 
@@ -165,7 +184,7 @@ export async function POST(request: Request) {
         data: {
           productId: prod.id,
           paymentPlanId: paymentPlan.id,
-          amount: parseFloat(String(amount)),
+          amount: numAmount,
           depositAmount: parseFloat(String(depositAmount))
         }
       });

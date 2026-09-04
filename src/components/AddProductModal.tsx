@@ -25,6 +25,9 @@ export function AddProductModal({
     handoverPlan: 'Hoàn thiện cao cấp',
     amount: '4800000000',
     depositAmount: '100000000',
+    giaTTS: '4320000000',
+    giaTTC: '4800000000',
+    giaVay: '4896000000',
     status: 'AVAILABLE'
   });
 
@@ -33,6 +36,21 @@ export function AddProductModal({
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleAmountChange = (val: string) => {
+    const num = parseFloat(val);
+    if (!isNaN(num)) {
+      setFormData(prev => ({
+        ...prev,
+        amount: val,
+        giaTTS: String(Math.round(num * 0.90)),
+        giaTTC: val,
+        giaVay: String(Math.round(num * 1.02))
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, amount: val }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +78,10 @@ export function AddProductModal({
           handoverPlan: formData.handoverPlan,
           amount: parseFloat(formData.amount),
           depositAmount: parseFloat(formData.depositAmount),
+          gianiemyet: parseFloat(formData.amount),
+          giaTTS: parseFloat(formData.giaTTS || formData.amount),
+          giaTTC: parseFloat(formData.giaTTC || formData.amount),
+          giaVay: parseFloat(formData.giaVay || formData.amount),
           status: formData.status,
           actorId: 'emp_prod_01',
           actorName: 'Nguyễn Tiến Dũng'
@@ -212,14 +234,16 @@ export function AddProductModal({
 
             {/* 7. Giá Niêm Yết */}
             <div className="sm:col-span-2">
-              <label className="block text-slate-300 font-bold mb-1">7. Giá Niêm Yết (VND) (*)</label>
+              <label className="block text-slate-300 font-bold mb-1">
+                7. Giá Niêm Yết (VND) (*) <span className="text-[10px] text-brand-400 font-normal">[Gianiemyet]</span>
+              </label>
               <div className="relative">
                 <input
                   type="number"
                   step="1000000"
                   placeholder="VD: 4800000000"
                   value={formData.amount}
-                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                  onChange={(e) => handleAmountChange(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-brand-500 font-bold text-brand-400 pl-3 pr-24"
                   required
                 />
@@ -241,17 +265,84 @@ export function AddProductModal({
                 className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-brand-500 font-semibold text-emerald-400"
               />
             </div>
+          </div>
 
+          {/* 3 Price Options as per Class Diagram: GiaTTS, GiaTTC, GiaVay */}
+          <div className="p-3.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-slate-200 flex items-center space-x-2">
+                <DollarSign className="w-4 h-4 text-brand-400" />
+                <span>Bảng Giá Chi Tiết Theo Phương Án Thanh Toán (Sơ đồ lớp Sản Phẩm)</span>
+              </div>
+              <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded-md">
+                Tự động gợi ý từ Giá niêm yết
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              {/* Giá TTS */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                  Giá TTS (Sớm 95% - CK 10%) <span className="text-amber-400 font-mono">[GiaTTS]</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.giaTTS}
+                  onChange={(e) => setFormData({ ...formData, giaTTS: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-amber-300 p-2 rounded-lg font-bold"
+                />
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  {formData.giaTTS ? `${(parseFloat(formData.giaTTS) / 1000000000).toFixed(2)} Tỷ` : ''}
+                </span>
+              </div>
+
+              {/* Giá TTC */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                  Giá TTC (Chuẩn tiến độ) <span className="text-blue-400 font-mono">[GiaTTC]</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.giaTTC}
+                  onChange={(e) => setFormData({ ...formData, giaTTC: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-blue-300 p-2 rounded-lg font-bold"
+                />
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  {formData.giaTTC ? `${(parseFloat(formData.giaTTC) / 1000000000).toFixed(2)} Tỷ` : ''}
+                </span>
+              </div>
+
+              {/* Giá Vay */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                  Giá Vay (HTLS Ngân hàng 70%) <span className="text-emerald-400 font-mono">[GiaVay]</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.giaVay}
+                  onChange={(e) => setFormData({ ...formData, giaVay: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-emerald-300 p-2 rounded-lg font-bold"
+                />
+                <span className="text-[10px] text-slate-400 block mt-0.5">
+                  {formData.giaVay ? `${(parseFloat(formData.giaVay) / 1000000000).toFixed(2)} Tỷ` : ''}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* 9. Trạng Thái Khởi Tạo */}
             <div>
-              <label className="block text-slate-300 font-bold mb-1">9. Trạng Thái Khởi Tạo</label>
+              <label className="block text-slate-300 font-bold mb-1">
+                9. Trạng Thái Khởi Tạo <span className="text-[10px] text-slate-400 font-normal">[Trangthai]</span>
+              </label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-brand-500 font-medium"
               >
-                <option value="AVAILABLE">Còn Hàng (Mở bán ngay)</option>
-                <option value="UNAVAILABLE">Tạm Ngưng (Khóa kỹ thuật)</option>
+                <option value="AVAILABLE">Còn Hàng (Mở bán ngay - AVAILABLE)</option>
+                <option value="UNAVAILABLE">Tạm Ngưng (Khóa kỹ thuật - UNAVAILABLE)</option>
               </select>
             </div>
           </div>

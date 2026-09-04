@@ -92,6 +92,7 @@ export async function POST(request: Request) {
 
     if (existingContract) {
       // Update existing contract with investor details
+      const contractCount = await db.contract.count();
       const updated = await db.contract.update({
         where: { id: existingContract.id },
         data: {
@@ -109,7 +110,24 @@ export async function POST(request: Request) {
           commissionDueDate: commissionDueDate || existingContract.commissionDueDate,
           commissionAmount: resolvedCommission,
           investorContractNo: investorContractNo || existingContract.investorContractNo,
-          investorNotes: investorNotes || existingContract.investorNotes
+          investorNotes: investorNotes || existingContract.investorNotes,
+
+          // Class diagram fields (Hopdong)
+          maHopdong: String(existingContract.maHopdong || (202600 + contractCount + 1)),
+          maKH: String(existingContract.maKH || 1001),
+          sodienthoaiKH: customer.phone,
+          cccdKH: customer.cccdHash || '001200009999',
+          emailKH: customer.email || 'khachhang@gmail.com',
+          diachiKH: customer.addressCiphertext || 'Hà Nội',
+          hotenKH: customer.fullName,
+          phuonganthanhtoan: 'Thanh toán chuẩn theo tiến độ',
+          giahopdong: resolvedPrice,
+          thoigiankiHDMB: signedDate ? new Date(signedDate) : existingContract.signedDate,
+          trangthaiHDMB: signingStatus,
+          doanhso: resolvedPrice,
+          hoahong: resolvedCommission,
+          trangthaiThanhtoan: commissionStatus,
+          ghichu: investorNotes || existingContract.investorNotes || 'Hợp đồng mua bán CĐT'
         },
         include: {
           product: { include: { project: true } },
@@ -129,6 +147,7 @@ export async function POST(request: Request) {
     const year = new Date().getFullYear();
     const rand = Math.floor(Math.random() * 8999 + 1000);
     const contractNumber = investorContractNo || `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
+    const contractCount = await db.contract.count();
 
     const snapshot = {
       productCode: product.productCode,
@@ -162,7 +181,24 @@ export async function POST(request: Request) {
         commissionAmount: resolvedCommission,
         investorContractNo: investorContractNo || contractNumber,
         investorNotes,
-        snapshotJson: JSON.stringify(snapshot)
+        snapshotJson: JSON.stringify(snapshot),
+
+        // Class diagram fields (Hopdong)
+        maHopdong: String(202600 + contractCount + 1),
+        maKH: String(1000 + contractCount + 1),
+        sodienthoaiKH: customer.phone,
+        cccdKH: customer.cccdHash || '001200009999',
+        emailKH: customer.email || 'khachhang@gmail.com',
+        diachiKH: customer.addressCiphertext || 'Hà Nội',
+        hotenKH: customer.fullName,
+        phuonganthanhtoan: 'Thanh toán chuẩn theo tiến độ',
+        giahopdong: resolvedPrice,
+        thoigiankiHDMB: signedDate ? new Date(signedDate) : null,
+        trangthaiHDMB: signingStatus,
+        doanhso: resolvedPrice,
+        hoahong: resolvedCommission,
+        trangthaiThanhtoan: commissionStatus,
+        ghichu: investorNotes || 'Hợp đồng mua bán chính thức CĐT'
       },
       include: {
         product: { include: { project: true } },
