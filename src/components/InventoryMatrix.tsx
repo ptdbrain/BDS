@@ -148,9 +148,9 @@ export function InventoryMatrix({
     if (buildingFilter !== 'ALL' && p.building !== buildingFilter) return false;
     
     if (statusFilter !== 'ALL') {
-      const isSold = p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc' || p.trangthai === 'Check Admin';
+      const isSold = p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc';
       const isLocked = (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') && !isSold;
-      const isAvailable = (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng') && !isSold && !isLocked;
+      const isAvailable = (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng' || p.trangthai === 'Check Admin') && !isSold && !isLocked;
       const isUnavailable = p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn';
 
       if (statusFilter === 'SOLD' && !isSold) return false;
@@ -168,17 +168,17 @@ export function InventoryMatrix({
 
   // Calculate status counts (Đã cọc = Đã bán theo nghiệp vụ)
   const soldUnitsCount = products.filter(
-    p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc' || p.trangthai === 'Check Admin'
+    p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc'
   ).length;
 
   const lockedUnitsCount = products.filter(
     p => (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') &&
-         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin'
+         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc'
   ).length;
 
   const availableUnitsCount = products.filter(
-    p => (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng') &&
-         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin' && p.trangthai !== 'Đã khớp' && p.status !== 'LOCKED'
+    p => (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng' || p.trangthai === 'Check Admin') &&
+         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Đã khớp' && p.status !== 'LOCKED'
   ).length;
 
   const counts = {
@@ -190,11 +190,14 @@ export function InventoryMatrix({
   };
 
   const getStatusBadge = (status: string, trangthai?: string | null) => {
-    if (status === 'SOLD' || status === 'DEPOSITED' || trangthai === 'Đã bán' || trangthai === 'Đã cọc' || trangthai === 'Check Admin') {
+    if (status === 'SOLD' || status === 'DEPOSITED' || trangthai === 'Đã bán' || trangthai === 'Đã cọc') {
       return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã Bán</span>;
     }
     if (status === 'LOCKED' || trangthai === 'Đã khớp') {
       return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang Lock 30m</span>;
+    }
+    if (trangthai === 'Check Admin') {
+      return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">Check Admin</span>;
     }
     if (status === 'AVAILABLE' || trangthai === 'Còn hàng') {
       return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn Hàng</span>;
@@ -608,9 +611,9 @@ export function InventoryMatrix({
                           {floor.units.map((prod) => {
                             const priceObj = prod.prices?.[0];
                             const displayPrice = priceObj ? `${(priceObj.amount / 1000000000).toFixed(2)} Tỷ` : 'Liên hệ';
-                            const isSold = prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc' || prod.trangthai === 'Check Admin';
+                            const isSold = prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc';
                             const isLocked = (prod.status === 'LOCKED' || prod.trangthai === 'Đã khớp') && !isSold;
-                            const isAvailable = (prod.status === 'AVAILABLE' || prod.trangthai === 'Còn hàng') && !isSold && !isLocked;
+                            const isAvailable = (prod.status === 'AVAILABLE' || prod.trangthai === 'Còn hàng' || prod.trangthai === 'Check Admin') && !isSold && !isLocked;
 
                             return (
                               <div
@@ -753,8 +756,14 @@ export function InventoryMatrix({
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">Trạng thái [Trangthai]</span>
-                <span className="text-sm font-bold text-purple-400">
-                  {selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc' || selectedProduct.trangthai === 'Check Admin'
+                <span className={`text-sm font-bold ${
+                  selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc'
+                    ? 'text-purple-400'
+                    : selectedProduct.trangthai === 'Check Admin'
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }`}>
+                  {selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc'
                     ? 'Đã bán'
                     : selectedProduct.trangthai || selectedProduct.status}
                 </span>

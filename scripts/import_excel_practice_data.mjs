@@ -413,11 +413,15 @@ async function main() {
     let systemTrangThai = row.TrangThai;
     if (row.TrangThai === 'Đã khớp') {
       systemStatus = 'LOCKED';
-    } else if (row.TrangThai === 'Check Admin' || row.TrangThai === 'Đã cọc' || row.TrangThai === 'Đã bán') {
+    } else if (row.TrangThai === 'Đã bán') {
       systemStatus = 'SOLD';
       systemTrangThai = 'Đã bán';
     } else if (row.TrangThai === 'CDT thu căn') {
       systemStatus = 'UNAVAILABLE';
+      systemTrangThai = 'CDT thu căn';
+    } else if (row.TrangThai === 'Check Admin') {
+      systemStatus = 'AVAILABLE';
+      systemTrangThai = 'Check Admin';
     } else {
       systemStatus = 'AVAILABLE';
     }

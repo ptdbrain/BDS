@@ -52,12 +52,12 @@ export async function GET(request: Request) {
       ]
     });
 
-    // Summary counts by status (Đã cọc = Đã bán)
+    // Summary counts by status (Đã cọc = Đã bán theo quy định chung)
     const statusSummary = {
       TOTAL: products.length,
-      AVAILABLE: products.filter(p => p.status === 'AVAILABLE' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin' && p.trangthai !== 'Đã khớp').length,
-      LOCKED: products.filter(p => p.status === 'LOCKED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin').length,
-      SOLD: products.filter(p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc' || p.trangthai === 'Check Admin').length,
+      AVAILABLE: products.filter(p => (p.status === 'AVAILABLE' || p.trangthai === 'Check Admin') && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Đã khớp').length,
+      LOCKED: products.filter(p => (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc').length,
+      SOLD: products.filter(p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc').length,
       UNAVAILABLE: products.filter(p => p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn').length,
     };
 
