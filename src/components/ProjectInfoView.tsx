@@ -37,39 +37,39 @@ interface ProjectInfoViewProps {
 
 const DEFAULT_SLIDES: SlideItem[] = [
   {
-    id: 's1',
-    url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=1600&q=85',
-    title: 'Phối Cảnh Toàn Cảnh Dự Án Về Đêm',
-    caption: 'Tổ hợp căn hộ cao cấp 3 tòa tháp ven hồ Tây với thiết kế kiến trúc chuẩn quốc tế.',
-    category: 'Tổng quan dự án'
+    id: 'vl-1',
+    url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1600&q=85',
+    title: '01. Giới Thiệu Dự Án The Vista Văn La (215 Oasis Villas)',
+    caption: 'Kiệt tác quy hoạch Xanh bền vững - Urban Green Oasis, ốc đảo xanh tâm phố Hà Đông.',
+    category: '01 TỔNG QUAN DỰ ÁN'
   },
   {
-    id: 's2',
-    url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85',
-    title: 'Sảnh Đón & Không Gian Sang Trọng 5 Sao',
-    caption: 'Sảnh đón tiếp khách bọc đá tự nhiên, lễ tân 24/7 và hệ thống kiểm soát an ninh nhận diện khuôn mặt.',
-    category: 'Tiện ích nội khu'
+    id: 'vl-2',
+    url: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=1600&q=85',
+    title: '02. Vị Trí Vàng Tâm Điểm Hà Đông & Tuyến Metro',
+    caption: 'Khu đô thị Văn La, kết nối trực tiếp ga đường sắt trên cao Cát Linh - Hà Đông và đường vành đai.',
+    category: '02 LIÊN KẾT VÙNG'
   },
   {
-    id: 's3',
-    url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=85',
-    title: 'Căn Hộ Mẫu 3 Phòng Ngủ Panorama',
-    caption: 'Tầm nhìn không giới hạn ôm trọn cảnh quan thành phố, ban công kính tràn viền sang trọng.',
-    category: 'Căn hộ mẫu'
-  },
-  {
-    id: 's4',
-    url: 'https://images.unsplash.com/photo-1600566753376-12c8ab7fb75b?auto=format&fit=crop&w=1600&q=85',
-    title: 'Mặt Bằng Tầng Điển Hình & Cơ Cấu Quỹ Căn',
-    caption: 'Bố trí 12 căn/sàn với 6 thang máy tốc độ cao, mật độ thông gió và chiếu sáng tự nhiên 100%.',
-    category: 'Mặt bằng kỹ thuật'
-  },
-  {
-    id: 's5',
+    id: 'vl-3',
     url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=1600&q=85',
-    title: 'Hồ Bơi Vô Cực Trên Tầng Thượng & Sky Bar',
-    caption: 'Tiện ích đặc quyền dành riêng cho cư dân: hồ bơi nước mặn 4 mùa trên tầng 36.',
-    category: 'Tiện ích trên cao'
+    title: '03. Hệ Thống Tiện Ích Xanh Ốc Đảo & Clubhouse VICC',
+    caption: 'Công viên xanh 5.000m², hồ cảnh quan điều hòa, bể bơi resort và văn phòng VICC An Khánh.',
+    category: '03 HỆ THỐNG TIỆN ÍCH'
+  },
+  {
+    id: 'vl-4',
+    url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=85',
+    title: '04. Bộ Sưu Tập 215 Căn Biệt Thự Oasis Villas & Liền Kề',
+    caption: 'Biệt thự đơn lập, song lập và shophouse kinh doanh thiết kế tân cổ điển sang trọng.',
+    category: '04 SẢN PHẨM BIỆT THỰ'
+  },
+  {
+    id: 'vl-5',
+    url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=1600&q=85',
+    title: '05. Định Hướng Danh Mục Bàn Giao Cao Cấp SJ Group',
+    caption: 'Hoàn thiện ngoại thất đồng bộ, vật liệu chuẩn quốc tế, kiểm soát an ninh đa lớp 24/7.',
+    category: '05 ĐỊNH HƯỚNG BÀN GIAO'
   }
 ];
 
