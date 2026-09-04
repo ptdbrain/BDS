@@ -408,13 +408,19 @@ async function main() {
     const numGiaTTC = Number(row.GiaTTC) || basePrice;
     const numGiaVay = Number(row.GiaVay) || Math.round(basePrice * 1.02);
 
-    // Ánh xạ trạng thái hiển thị
+    // Ánh xạ trạng thái hiển thị (Đã cọc = Đã bán theo nghiệp vụ AHS)
     let systemStatus = 'AVAILABLE';
-    if (row.TrangThai === 'Đã khớp') systemStatus = 'LOCKED';
-    else if (row.TrangThai === 'Check Admin') systemStatus = 'DEPOSITED';
-    else if (row.TrangThai === 'Đã bán') systemStatus = 'SOLD';
-    else if (row.TrangThai === 'CDT thu căn') systemStatus = 'UNAVAILABLE';
-    else systemStatus = 'AVAILABLE';
+    let systemTrangThai = row.TrangThai;
+    if (row.TrangThai === 'Đã khớp') {
+      systemStatus = 'LOCKED';
+    } else if (row.TrangThai === 'Check Admin' || row.TrangThai === 'Đã cọc' || row.TrangThai === 'Đã bán') {
+      systemStatus = 'SOLD';
+      systemTrangThai = 'Đã bán';
+    } else if (row.TrangThai === 'CDT thu căn') {
+      systemStatus = 'UNAVAILABLE';
+    } else {
+      systemStatus = 'AVAILABLE';
+    }
 
     const prod = await prisma.product.create({
       data: {
@@ -435,7 +441,7 @@ async function main() {
         giaTTS: numGiaTTS,
         giaTTC: numGiaTTC,
         giaVay: numGiaVay,
-        trangthai: row.TrangThai || 'Còn hàng'
+        trangthai: systemTrangThai || 'Còn hàng'
       }
     });
     productMap.set(row.MaCan, prod);

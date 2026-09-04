@@ -143,10 +143,22 @@ export function InventoryMatrix({
   // Buildings list
   const buildings = Array.from(new Set(products.map(p => p.building)));
 
-  // Filter products
+  // Filter products (Đã cọc = Đã bán theo quy định AHS)
   const filteredProducts = products.filter(p => {
     if (buildingFilter !== 'ALL' && p.building !== buildingFilter) return false;
-    if (statusFilter !== 'ALL' && p.status !== statusFilter) return false;
+    
+    if (statusFilter !== 'ALL') {
+      const isSold = p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc' || p.trangthai === 'Check Admin';
+      const isLocked = (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') && !isSold;
+      const isAvailable = (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng') && !isSold && !isLocked;
+      const isUnavailable = p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn';
+
+      if (statusFilter === 'SOLD' && !isSold) return false;
+      if (statusFilter === 'LOCKED' && !isLocked) return false;
+      if (statusFilter === 'AVAILABLE' && !isAvailable) return false;
+      if (statusFilter === 'UNAVAILABLE' && !isUnavailable) return false;
+    }
+
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return p.productCode.toLowerCase().includes(q) || p.building.toLowerCase().includes(q);
@@ -154,33 +166,40 @@ export function InventoryMatrix({
     return true;
   });
 
-  // Calculate status counts
+  // Calculate status counts (Đã cọc = Đã bán theo nghiệp vụ)
+  const soldUnitsCount = products.filter(
+    p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc' || p.trangthai === 'Check Admin'
+  ).length;
+
+  const lockedUnitsCount = products.filter(
+    p => (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') &&
+         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin'
+  ).length;
+
+  const availableUnitsCount = products.filter(
+    p => (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng') &&
+         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Check Admin' && p.trangthai !== 'Đã khớp' && p.status !== 'LOCKED'
+  ).length;
+
   const counts = {
     TOTAL: products.length,
-    AVAILABLE: products.filter(p => p.status === 'AVAILABLE').length,
-    LOCKED: products.filter(p => p.status === 'LOCKED').length,
-    DEPOSITED: products.filter(p => p.status === 'DEPOSITED').length,
-    SOLD: products.filter(p => p.status === 'SOLD').length,
-    UNAVAILABLE: products.filter(p => p.status === 'UNAVAILABLE').length,
+    AVAILABLE: availableUnitsCount,
+    LOCKED: lockedUnitsCount,
+    SOLD: soldUnitsCount,
+    UNAVAILABLE: products.filter(p => p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn').length,
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'AVAILABLE':
-      case 'Còn hàng':
-        return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn Hàng</span>;
-      case 'LOCKED':
-      case 'Đã khớp':
-        return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang Lock 30m</span>;
-      case 'DEPOSITED':
-      case 'Check Admin':
-        return <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Đã Cọc</span>;
-      case 'SOLD':
-      case 'Đã bán':
-        return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã Bán</span>;
-      default:
-        return <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">Tạm Ngưng</span>;
+  const getStatusBadge = (status: string, trangthai?: string | null) => {
+    if (status === 'SOLD' || status === 'DEPOSITED' || trangthai === 'Đã bán' || trangthai === 'Đã cọc' || trangthai === 'Check Admin') {
+      return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã Bán</span>;
     }
+    if (status === 'LOCKED' || trangthai === 'Đã khớp') {
+      return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang Lock 30m</span>;
+    }
+    if (status === 'AVAILABLE' || trangthai === 'Còn hàng') {
+      return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn Hàng</span>;
+    }
+    return <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">Tạm Ngưng</span>;
   };
 
   // Group products by building and floor for matrix view
@@ -238,7 +257,6 @@ export function InventoryMatrix({
                 <option value="ALL">Tất cả Trạng Thái</option>
                 <option value="AVAILABLE">Còn Hàng</option>
                 <option value="LOCKED">Đang Lock 30m</option>
-                <option value="DEPOSITED">Đã Cọc</option>
                 <option value="SOLD">Đã Bán</option>
               </select>
             )}
@@ -520,7 +538,7 @@ export function InventoryMatrix({
       ) : (
         <div className="space-y-6">
           {/* Status KPI Summary Chips */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="glass-panel p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
               <div>
                 <div className="text-[11px] text-slate-400 font-semibold uppercase">Tổng Quỹ Hàng</div>
@@ -545,14 +563,6 @@ export function InventoryMatrix({
                 <div className="text-xl font-black text-amber-400 mt-0.5">{counts.LOCKED}</div>
               </div>
               <Lock className="w-4 h-4 text-amber-400 animate-bounce" />
-            </div>
-
-            <div className="glass-panel p-3.5 rounded-xl border border-cyan-500/20 bg-cyan-950/10 flex items-center justify-between">
-              <div>
-                <div className="text-[11px] text-accent-cyan font-semibold uppercase">Đã Cọc</div>
-                <div className="text-xl font-black text-accent-cyan mt-0.5">{counts.DEPOSITED}</div>
-              </div>
-              <CheckCircle className="w-4 h-4 text-accent-cyan" />
             </div>
 
             <div className="glass-panel p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/10 flex items-center justify-between">
@@ -598,20 +608,20 @@ export function InventoryMatrix({
                           {floor.units.map((prod) => {
                             const priceObj = prod.prices?.[0];
                             const displayPrice = priceObj ? `${(priceObj.amount / 1000000000).toFixed(2)} Tỷ` : 'Liên hệ';
-                            const isAvailable = prod.status === 'AVAILABLE';
+                            const isSold = prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc' || prod.trangthai === 'Check Admin';
+                            const isLocked = (prod.status === 'LOCKED' || prod.trangthai === 'Đã khớp') && !isSold;
+                            const isAvailable = (prod.status === 'AVAILABLE' || prod.trangthai === 'Còn hàng') && !isSold && !isLocked;
 
                             return (
                               <div
                                 key={prod.id}
                                 onClick={() => setSelectedProduct(prod)}
                                 className={`p-3 rounded-xl border transition cursor-pointer relative group glass-panel-hover ${
-                                  prod.status === 'AVAILABLE'
+                                  isAvailable
                                     ? 'bg-slate-900/80 border-slate-700/60 hover:border-emerald-500'
-                                    : prod.status === 'LOCKED'
+                                    : isLocked
                                     ? 'bg-amber-950/20 border-amber-500/40 hover:border-amber-400'
-                                    : prod.status === 'DEPOSITED'
-                                    ? 'bg-cyan-950/20 border-accent-cyan/40 hover:border-accent-cyan'
-                                    : prod.status === 'SOLD'
+                                    : isSold
                                     ? 'bg-purple-950/20 border-purple-500/40'
                                     : 'bg-slate-950/40 border-slate-800 opacity-60'
                                 }`}
@@ -620,7 +630,7 @@ export function InventoryMatrix({
                                   <span className="text-xs font-black text-white group-hover:text-brand-300 transition">
                                     {prod.productCode}
                                   </span>
-                                  {getStatusBadge(prod.status)}
+                                  {getStatusBadge(prod.status, prod.trangthai)}
                                 </div>
 
                                 <div className="text-[11px] text-slate-300 font-semibold mb-1">
@@ -685,7 +695,7 @@ export function InventoryMatrix({
                         <td className="p-3.5 text-slate-300">
                           {priceObj ? Number(priceObj.depositAmount).toLocaleString('vi-VN') : '100.000.000'}
                         </td>
-                        <td className="p-3.5">{getStatusBadge(prod.status)}</td>
+                        <td className="p-3.5">{getStatusBadge(prod.status, prod.trangthai)}</td>
                         <td className="p-3.5 text-right">
                           <button
                             onClick={() => setSelectedProduct(prod)}
@@ -713,7 +723,7 @@ export function InventoryMatrix({
               <div>
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-black text-white">Căn Hộ {selectedProduct.productCode}</h2>
-                  {getStatusBadge(selectedProduct.status)}
+                  {getStatusBadge(selectedProduct.status, selectedProduct.trangthai)}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
                   {selectedProduct.building} | Tầng {selectedProduct.floor} | Dự án AHS Grand Horizon
@@ -743,7 +753,11 @@ export function InventoryMatrix({
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">Trạng thái [Trangthai]</span>
-                <span className="text-sm font-bold text-emerald-400">{selectedProduct.trangthai || selectedProduct.status}</span>
+                <span className="text-sm font-bold text-purple-400">
+                  {selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc' || selectedProduct.trangthai === 'Check Admin'
+                    ? 'Đã bán'
+                    : selectedProduct.trangthai || selectedProduct.status}
+                </span>
               </div>
             </div>
 
