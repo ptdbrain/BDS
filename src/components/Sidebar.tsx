@@ -132,20 +132,6 @@ export function Sidebar({
       icon: FileText,
       badge: pendingContractsCount > 0 ? pendingContractsCount : null,
       badgeColor: 'bg-purple-500'
-    },
-    {
-      id: 'inventory' as TabType,
-      label: '4. Tra Cứu Bảng Hàng',
-      desc: 'Tra cứu trạng thái căn hộ',
-      icon: Grid,
-      badge: null
-    },
-    {
-      id: 'reports' as TabType,
-      label: '5. Báo Cáo Tổng Hợp',
-      desc: 'Báo cáo bán hàng & doanh thu',
-      icon: BarChart3,
-      badge: null
     }
   ];
 

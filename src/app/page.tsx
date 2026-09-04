@@ -205,7 +205,7 @@ export default function Home() {
         setActiveTab('inventory');
       }
     } else if (role === 'SALES_ADMIN') {
-      if (activeTab === 'transactions_revenue' || activeTab === 'audit') {
+      if (activeTab === 'transactions_revenue' || activeTab === 'audit' || activeTab === 'inventory' || activeTab === 'reports') {
         setActiveTab('locks');
       }
     } else if (role === 'SALES') {
