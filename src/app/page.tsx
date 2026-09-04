@@ -13,11 +13,18 @@ import { AuditTrail } from '@/components/AuditTrail';
 import { ImportModal } from '@/components/ImportModal';
 import { PersonalRevenueView } from '@/components/PersonalRevenueView';
 import { VietQRModal } from '@/components/VietQRModal';
+import { LoginScreen } from '@/components/LoginScreen';
+import { SwitchAccountModal } from '@/components/SwitchAccountModal';
+import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
 import { broadcastSync, onSync } from '@/lib/sync';
 
 export default function Home() {
+  // Authentication & Role State
+  const [currentUser, setCurrentUser] = useState<any | null>(null);
   const [currentRole, setCurrentRole] = useState<UserRole>('SALES');
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAuthChecking, setIsAuthChecking] = useState<boolean>(true);
+  const [isSwitchSSOModalOpen, setIsSwitchSSOModalOpen] = useState<boolean>(false);
+
   const [activeTab, setActiveTab] = useState<TabType>('inventory');
 
   // Application Data States
@@ -35,16 +42,28 @@ export default function Home() {
   const [activeLockModal, setActiveLockModal] = useState<any | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
-  // Fetch Current User based on Role
-  const fetchCurrentUser = useCallback(async (role: UserRole) => {
+  // Check stored auth on boot
+  useEffect(() => {
     try {
-      const res = await fetch(`/api/v1/auth/me?role=${role}`);
-      const data = await res.json();
-      if (data.data) {
-        setCurrentUser(data.data);
+      const stored = localStorage.getItem('ahs_auth_user');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && (parsed.employeeCode || parsed.id)) {
+          setCurrentUser(parsed);
+          setCurrentRole(parsed.role || 'SALES');
+          if (parsed.role === 'SALES_ADMIN') {
+            setActiveTab('locks');
+          } else if (parsed.role === 'MANAGER') {
+            setActiveTab('reports');
+          } else {
+            setActiveTab('inventory');
+          }
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch current user', err);
+    } catch (e) {
+      console.error('Failed to parse stored user:', e);
+    } finally {
+      setIsAuthChecking(false);
     }
   }, []);
 
@@ -147,17 +166,20 @@ export default function Home() {
     setLastSyncTime(new Date().toLocaleTimeString('vi-VN'));
   }, [fetchProducts]);
 
-  // 1. Initial boot
+  // Initial boot
   useEffect(() => {
-    fetchProjects();
-    fetchCurrentUser(currentRole);
-  }, [fetchCurrentUser, currentRole]);
+    if (currentUser) {
+      fetchProjects();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
-    refreshAllData();
-  }, [selectedProjectId, refreshAllData]);
+    if (currentUser) {
+      refreshAllData();
+    }
+  }, [selectedProjectId, refreshAllData, currentUser]);
 
-  // 2. Realtime Synchronization via BroadcastChannel & LocalStorage across ALL tabs/windows
+  // Realtime Synchronization via BroadcastChannel & LocalStorage
   useEffect(() => {
     const unsubscribe = onSync((msg) => {
       refreshAllData();
@@ -165,7 +187,7 @@ export default function Home() {
     return () => unsubscribe();
   }, [refreshAllData]);
 
-  // 3. Tab visibility / Window focus instant auto-refresh
+  // Tab visibility / Window focus instant auto-refresh
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -184,13 +206,14 @@ export default function Home() {
     };
   }, [refreshAllData]);
 
-  // 4. Background Polling Sweep every 3 seconds for continuous live data
+  // Background Polling Sweep every 3 seconds
   useEffect(() => {
+    if (!currentUser) return;
     const interval = setInterval(() => {
       refreshAllData();
     }, 3000);
     return () => clearInterval(interval);
-  }, [refreshAllData]);
+  }, [refreshAllData, currentUser]);
 
   // Action: Lock product 30m
   const handleLockProduct = async (productId: string) => {
@@ -244,27 +267,61 @@ export default function Home() {
     setActiveTab('customers');
   };
 
-  const activeLocksCount = locks.filter(l => l.status === 'ACTIVE' || l.status === 'PAYMENT_PENDING').length;
-  const pendingVerificationsCount = customers.filter(c => c.verificationStatus === 'PENDING_VERIFICATION').length;
-  const pendingContractsCount = contracts.filter(c => c.status === 'PENDING_REVIEW').length;
+  // Auth: Handle Login Success
+  const handleLoginSuccess = (user: any) => {
+    setCurrentUser(user);
+    setCurrentRole(user.role);
+    try {
+      localStorage.setItem('ahs_auth_user', JSON.stringify(user));
+    } catch (e) {}
 
+    // Default tab based on role
+    if (user.role === 'SALES_ADMIN') {
+      setActiveTab('locks');
+    } else if (user.role === 'PRODUCT_ADMIN') {
+      setActiveTab('inventory');
+    } else if (user.role === 'MANAGER') {
+      setActiveTab('reports');
+    } else {
+      setActiveTab('inventory');
+    }
+
+    refreshAllData();
+    broadcastSync('ALL_DATA_UPDATED');
+  };
+
+  // Auth: Handle Logout
+  const handleLogout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('ahs_auth_user');
+    } catch (e) {}
+  };
+
+  // Auth: Handle Switch SSO Account
+  const handleSwitchSSOAccount = async (account: SSOAccountConfig) => {
+    try {
+      const res = await fetch('/api/v1/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ssoCode: account.code })
+      });
+      const data = await res.json();
+      if (data.data?.user) {
+        handleLoginSuccess(data.data.user);
+      }
+    } catch (err) {
+      console.error('Failed to switch SSO account:', err);
+    }
+  };
+
+  // Role switch from dropdown
   const handleRoleChange = (role: UserRole) => {
     setCurrentRole(role);
-    fetchCurrentUser(role);
-    refreshAllData();
-
-    if (role === 'PRODUCT_ADMIN') {
-      if (activeTab === 'customers' || activeTab === 'transactions_revenue' || activeTab === 'contracts' || activeTab === 'audit') {
-        setActiveTab('inventory');
-      }
-    } else if (role === 'SALES_ADMIN') {
-      if (activeTab === 'transactions_revenue' || activeTab === 'audit' || activeTab === 'inventory' || activeTab === 'reports') {
-        setActiveTab('locks');
-      }
-    } else if (role === 'SALES') {
-      if (activeTab === 'locks' || activeTab === 'contracts' || activeTab === 'reports' || activeTab === 'audit') {
-        setActiveTab('inventory');
-      }
+    // Find matching SSO account for this role
+    const matchedAccount = SSO_ACCOUNTS.find((a) => a.role === role);
+    if (matchedAccount) {
+      handleSwitchSSOAccount(matchedAccount);
     }
   };
 
@@ -273,13 +330,37 @@ export default function Home() {
     refreshAllData();
   };
 
+  // If loading auth state
+  if (isAuthChecking) {
+    return (
+      <div className="min-h-screen bg-[#07090e] flex items-center justify-center">
+        <div className="flex items-center space-x-3 text-slate-300">
+          <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs font-semibold">Đang khởi tạo hệ thống phân quyền...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // If user not logged in -> Display ultra-modern Login Screen with 5 SSO accounts
+  if (!currentUser) {
+    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const activeLocksCount = locks.filter(l => l.status === 'ACTIVE' || l.status === 'PAYMENT_PENDING').length;
+  const pendingVerificationsCount = customers.filter(c => c.verificationStatus === 'PENDING_VERIFICATION').length;
+  const pendingContractsCount = contracts.filter(c => c.status === 'PENDING_REVIEW').length;
+
   const currentProject = projects.find(p => p.id === selectedProjectId);
 
   return (
     <div className="min-h-screen flex flex-col bg-[#080b11]">
       <Navbar
         currentRole={currentRole}
+        currentUser={currentUser}
         onRoleChange={handleRoleChange}
+        onLogout={handleLogout}
+        onOpenSSOModal={() => setIsSwitchSSOModalOpen(true)}
         activeProjectName={currentProject?.name}
       />
 
@@ -360,6 +441,14 @@ export default function Home() {
           )}
         </main>
       </div>
+
+      {/* Switch Account SSO Modal */}
+      <SwitchAccountModal
+        isOpen={isSwitchSSOModalOpen}
+        onClose={() => setIsSwitchSSOModalOpen(false)}
+        currentEmployeeCode={currentUser?.employeeCode}
+        onSwitchAccount={handleSwitchSSOAccount}
+      />
 
       {/* Instant VietQR Payment Modal */}
       {activeLockModal && (
