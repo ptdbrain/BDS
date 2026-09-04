@@ -509,15 +509,15 @@ export function InventoryMatrix({
                           <div className="font-semibold text-white">{b.customerName || 'Khách hàng'}</div>
                           <div className="text-[11px] text-slate-400">{b.customerPhone}</div>
                         </td>
-                        <td className="p-3.5 text-slate-300">
-                          {new Date(b.tgBooking).toLocaleString('vi-VN')}
+                        <td className="p-3.5 text-slate-300 font-mono text-[11px]">
+                          {new Date(b.tgBooking).toLocaleDateString('vi-VN')} {new Date(b.tgBooking).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td className="p-3.5">
-                          <div className="text-[11px] text-emerald-400">
-                            Bắt đầu: {b.tgBatdaukhop ? new Date(b.tgBatdaukhop).toLocaleDateString('vi-VN') : 'Khi mở bán'}
+                          <div className="text-[11px] text-emerald-400 font-mono">
+                            Bắt đầu: {b.tgBatdaukhop ? `${new Date(b.tgBatdaukhop).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${new Date(b.tgBatdaukhop).toLocaleDateString('vi-VN')}` : 'Khi mở bán'}
                           </div>
-                          <div className="text-[11px] text-rose-400">
-                            Kết thúc: {b.tgKetthuckhopcan ? new Date(b.tgKetthuckhopcan).toLocaleDateString('vi-VN') : 'Sau 3 ngày'}
+                          <div className="text-[11px] text-rose-400 font-mono">
+                            Kết thúc: {b.tgKetthuckhopcan ? `${new Date(b.tgKetthuckhopcan).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${new Date(b.tgKetthuckhopcan).toLocaleDateString('vi-VN')}` : 'Sau 10 phút'}
                           </div>
                         </td>
                         <td className="p-3.5 font-bold text-brand-400">

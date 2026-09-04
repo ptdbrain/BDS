@@ -62,9 +62,8 @@ export function VietQRModal({
 
   if (!isOpen || !lock) return null;
 
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const timeFormatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  const minutes = Math.max(1, Math.ceil(timeLeft / 60));
+  const timeFormatted = `${minutes} phút`;
 
   const productCode = lock.product?.productCode || 'A-0106';
   const depositAmount = 100000000;

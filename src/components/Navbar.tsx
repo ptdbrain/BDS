@@ -38,8 +38,12 @@ export function Navbar({
   const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
 
   useEffect(() => {
-    const update = () =>
-      setTime(new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+    const update = () => {
+      const d = new Date();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      setTime(`${hours}:${minutes}`);
+    };
     update();
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);

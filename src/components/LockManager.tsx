@@ -65,12 +65,11 @@ export function LockManager({
 
     if (diffMs <= 0) return { expired: true, text: 'Hết hạn 30m', seconds: 0 };
 
-    const mins = Math.floor(diffMs / 60000);
-    const secs = Math.floor((diffMs % 60000) / 1000);
+    const mins = Math.max(1, Math.ceil(diffMs / 60000));
 
     return {
       expired: false,
-      text: `${mins} phút ${secs < 10 ? '0' : ''}${secs}s`,
+      text: `${mins} phút`,
       isWarning: mins < 5,
       seconds: Math.floor(diffMs / 1000)
     };
