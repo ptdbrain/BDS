@@ -107,6 +107,17 @@ export function InventoryMatrix({
     setIsSubmittingBooking(true);
     setBookingError(null);
     try {
+      let currentSalesId = 'NV001';
+      try {
+        const authUser = localStorage.getItem('ahs_auth_user');
+        if (authUser) {
+          const parsed = JSON.parse(authUser);
+          if (parsed.id || parsed.employeeCode) {
+            currentSalesId = parsed.id || parsed.employeeCode;
+          }
+        }
+      } catch (e) {}
+
       const res = await fetch('/api/v1/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -116,7 +127,7 @@ export function InventoryMatrix({
           customerPhone: bookingFormData.customerPhone,
           depositAmount: parseFloat(bookingFormData.depositAmount),
           notes: bookingFormData.notes,
-          salesEmployeeId: 'emp_sales_01'
+          salesEmployeeId: currentSalesId
         })
       });
       if (!res.ok) {

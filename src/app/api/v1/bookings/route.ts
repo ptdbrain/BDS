@@ -57,12 +57,47 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Không tìm thấy dự án' }, { status: 404 });
     }
 
+    // Pre-resolve valid sales employee ID
+    let validSalesId = salesEmployeeId;
+    let emp = null;
+
+    if (salesEmployeeId && salesEmployeeId !== 'emp_sales_01') {
+      emp = await db.employee.findFirst({
+        where: {
+          OR: [
+            { id: salesEmployeeId },
+            { employeeCode: salesEmployeeId },
+            { maNV: salesEmployeeId }
+          ]
+        }
+      });
+    }
+
+    if (!emp) {
+      emp = await db.employee.findFirst({
+        where: {
+          OR: [
+            { employeeCode: 'NV001' },
+            { maNV: 'NV001' }
+          ]
+        }
+      }) || await db.employee.findFirst();
+    }
+
+    if (emp) {
+      validSalesId = emp.id;
+    }
+
     // Find current max STT for this project
     const bookingCount = await db.booking.count({
       where: { projectId }
     });
-    const nextStt = bookingCount + 1;
-    const bookingCode = `BK-${project.code}-${String(nextStt).padStart(4, '0')}`;
+    let nextStt = bookingCount + 1;
+    let bookingCode = `BK-${project.code || 'PRJ'}-${String(nextStt).padStart(4, '0')}`;
+    while (await db.booking.findUnique({ where: { maLuotBooking: bookingCode } })) {
+      nextStt += 1;
+      bookingCode = `BK-${project.code || 'PRJ'}-${String(nextStt).padStart(4, '0')}`;
+    }
 
     const now = new Date();
     // Default match window: 3 days after project open
@@ -73,7 +108,7 @@ export async function POST(request: Request) {
       data: {
         maLuotBooking: bookingCode,
         projectId,
-        salesEmployeeId,
+        salesEmployeeId: validSalesId,
         sttBooking: nextStt,
         tgBooking: now,
         tgBatdaukhop: defaultStartMatch,
