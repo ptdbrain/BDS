@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function GET() {
   try {
@@ -122,6 +123,8 @@ export async function POST(request: Request) {
     const resolvedPrice = dealRevenue || agreedPrice || product.prices[0]?.amount || 4500000000;
     const resolvedCommission = commissionAmount !== undefined ? commissionAmount : (resolvedPrice * 0.03);
 
+    const validSalesId = await resolveEmployeeId(salesEmployeeId, 'SALES');
+
     // Check if contract exists for this product
     const existingContract = await db.contract.findFirst({
       where: { productId }
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
         data: {
           customerId: resolvedCustomerId,
           lockId: lockId || existingContract.lockId,
-          salesEmployeeId: salesEmployeeId || existingContract.salesEmployeeId,
+          salesEmployeeId: validSalesId,
           paymentPlanId: resolvedPlanId,
           agreedPrice: Number(giahopdong || resolvedPrice),
           dealRevenue: Number(doanhso || resolvedPrice),
@@ -152,11 +155,11 @@ export async function POST(request: Request) {
           // Class diagram fields (Hopdong)
           maHopdong: String(maHopdong || existingContract.maHopdong || (202600 + contractCount + 1)),
           maKH: String(maKH || existingContract.maKH || 1001),
-          sodienthoaiKH: sodienthoaiKH || customer.phone,
-          cccdKH: cccdKH || customer.cccdHash || '001200009999',
-          emailKH: emailKH || customer.email || 'khachhang@gmail.com',
-          diachiKH: diachiKH || customer.addressCiphertext || 'Hà Nội',
-          hotenKH: hotenKH || customer.fullName,
+          sodienthoaiKH: sodienthoaiKH || customer?.phone,
+          cccdKH: cccdKH || customer?.cccdHash || '001200009999',
+          emailKH: emailKH || customer?.email || 'khachhang@gmail.com',
+          diachiKH: diachiKH || customer?.addressCiphertext || 'Hà Nội',
+          hotenKH: hotenKH || customer?.fullName,
           phuonganthanhtoan: phuonganthanhtoan || 'Thanh toán chuẩn theo tiến độ',
           giahopdong: Number(giahopdong || resolvedPrice),
           thoigiankiHDMB: signedDate ? new Date(signedDate) : existingContract.signedDate,
@@ -173,6 +176,36 @@ export async function POST(request: Request) {
           paymentPlan: true
         }
       });
+
+      // Update customer & trigger pending verification for Sales Admin
+      if (resolvedCustomerId) {
+        await db.customer.update({
+          where: { id: resolvedCustomerId },
+          data: {
+            fullName: hotenKH || customer?.fullName,
+            phone: sodienthoaiKH || customer?.phone,
+            email: emailKH || customer?.email,
+            cccdHash: cccdKH || customer?.cccdHash,
+            cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : customer?.cccdCiphertext,
+            addressCiphertext: diachiKH || customer?.addressCiphertext,
+            verificationStatus: 'PENDING_VERIFICATION'
+          }
+        }).catch(() => {});
+
+        const pendingVer = await db.customerVerification.findFirst({
+          where: { customerId: resolvedCustomerId, status: 'PENDING' }
+        });
+        if (!pendingVer) {
+          await db.customerVerification.create({
+            data: {
+              customerId: resolvedCustomerId,
+              submittedById: validSalesId,
+              status: 'PENDING',
+              notes: `Hồ sơ hợp đồng căn ${product.productCode} chờ Sales Admin duyệt thông tin khách hàng`
+            }
+          }).catch(() => {});
+        }
+      }
 
       return NextResponse.json({
         message: 'Cập nhật thông tin hợp đồng CĐT thành công!',
@@ -205,7 +238,7 @@ export async function POST(request: Request) {
         productId,
         customerId: resolvedCustomerId,
         lockId,
-        salesEmployeeId,
+        salesEmployeeId: validSalesId,
         paymentPlanId: resolvedPlanId,
         agreedPrice: Number(giahopdong || resolvedPrice),
         dealRevenue: Number(doanhso || resolvedPrice),
@@ -244,6 +277,36 @@ export async function POST(request: Request) {
         paymentPlan: true
       }
     });
+
+    // Update customer & trigger pending verification for Sales Admin
+    if (resolvedCustomerId) {
+      await db.customer.update({
+        where: { id: resolvedCustomerId },
+        data: {
+          fullName: hotenKH || customer?.fullName,
+          phone: sodienthoaiKH || customer?.phone,
+          email: emailKH || customer?.email,
+          cccdHash: cccdKH || customer?.cccdHash,
+          cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : customer?.cccdCiphertext,
+          addressCiphertext: diachiKH || customer?.addressCiphertext,
+          verificationStatus: 'PENDING_VERIFICATION'
+        }
+      }).catch(() => {});
+
+      const pendingVer = await db.customerVerification.findFirst({
+        where: { customerId: resolvedCustomerId, status: 'PENDING' }
+      });
+      if (!pendingVer) {
+        await db.customerVerification.create({
+          data: {
+            customerId: resolvedCustomerId,
+            submittedById: validSalesId,
+            status: 'PENDING',
+            notes: `Hồ sơ hợp đồng căn ${product.productCode} chờ Sales Admin duyệt thông tin khách hàng`
+          }
+        }).catch(() => {});
+      }
+    }
 
     await createAuditLog({
       actorId: salesEmployeeId,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
   request: Request,
@@ -8,7 +9,7 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { reviewerId = 'emp_admin_01', reviewerName = 'Phạm Thị Mai', issues = [], notes } = body;
+    const { reviewerId = 'NV007', reviewerName = 'Vũ Mai Phương (Sales Admin)', issues = [], notes } = body;
 
     const verification = await db.customerVerification.findUnique({
       where: { id: params.id }
@@ -18,11 +19,13 @@ export async function POST(
       return NextResponse.json({ error: 'Verification record not found' }, { status: 404 });
     }
 
+    const validReviewerId = await resolveEmployeeId(reviewerId, 'SALES_ADMIN');
+
     await db.customerVerification.update({
       where: { id: params.id },
       data: {
         status: 'CHANGE_REQUESTED',
-        reviewedById: reviewerId,
+        reviewedById: validReviewerId,
         fieldIssuesJson: JSON.stringify(issues),
         notes: notes || 'Yêu cầu cập nhật lại thông tin PII khách hàng'
       }

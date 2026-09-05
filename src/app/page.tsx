@@ -417,6 +417,7 @@ export default function Home() {
             <CustomerManager
               customers={customers}
               currentRole={currentRole}
+              currentUser={currentUser}
               onRefresh={refreshAllData}
             />
           )}

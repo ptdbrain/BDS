@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function GET(
   request: Request,
@@ -124,7 +125,9 @@ export async function PATCH(
 
     if (investorContractNo !== undefined) dataToUpdate.investorContractNo = investorContractNo;
     if (commissionDueDate !== undefined) dataToUpdate.commissionDueDate = commissionDueDate;
-    if (salesEmployeeId !== undefined) dataToUpdate.salesEmployeeId = salesEmployeeId;
+    if (salesEmployeeId !== undefined) {
+      dataToUpdate.salesEmployeeId = await resolveEmployeeId(salesEmployeeId, 'SALES');
+    }
 
     if (signedDate !== undefined) {
       dataToUpdate.signedDate = signedDate ? new Date(signedDate) : null;
@@ -149,18 +152,39 @@ export async function PATCH(
     }
 
     // Update Customer details if provided
-    if (existing.customerId && (hotenKH || sodienthoaiKH || cccdKH || emailKH || diachiKH)) {
+    if (existing.customerId && (hotenKH || sodienthoaiKH || cccdKH || emailKH || diachiKH || status === 'PENDING_REVIEW')) {
+      const customerUpdateData: any = {
+        fullName: hotenKH || existing.customer?.fullName,
+        phone: sodienthoaiKH || existing.customer?.phone,
+        email: emailKH || existing.customer?.email,
+        cccdHash: cccdKH || existing.customer?.cccdHash,
+        cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : existing.customer?.cccdCiphertext,
+        addressCiphertext: diachiKH || existing.customer?.addressCiphertext
+      };
+      if (status === 'PENDING_REVIEW') {
+        customerUpdateData.verificationStatus = 'PENDING_VERIFICATION';
+      }
       await db.customer.update({
         where: { id: existing.customerId },
-        data: {
-          fullName: hotenKH || existing.customer?.fullName,
-          phone: sodienthoaiKH || existing.customer?.phone,
-          email: emailKH || existing.customer?.email,
-          cccdHash: cccdKH || existing.customer?.cccdHash,
-          cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : existing.customer?.cccdCiphertext,
-          addressCiphertext: diachiKH || existing.customer?.addressCiphertext
-        }
+        data: customerUpdateData
       }).catch(err => console.error('Error updating customer record:', err));
+
+      if (status === 'PENDING_REVIEW') {
+        const pendingVer = await db.customerVerification.findFirst({
+          where: { customerId: existing.customerId, status: 'PENDING' }
+        });
+        const submitterId = dataToUpdate.salesEmployeeId || existing.salesEmployeeId;
+        if (!pendingVer) {
+          await db.customerVerification.create({
+            data: {
+              customerId: existing.customerId,
+              submittedById: submitterId,
+              status: 'PENDING',
+              notes: `Hồ sơ hợp đồng chờ Sales Admin duyệt`
+            }
+          }).catch(err => console.error('Error creating CustomerVerification:', err));
+        }
+      }
     }
 
     const updated = await db.contract.update({

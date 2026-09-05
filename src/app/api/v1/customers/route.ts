@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { encryptPII, decryptPII, hashPII } from '@/lib/security';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 function maskCCCD(cccd: string) {
   if (!cccd || cccd.length < 4) return '********';
@@ -187,6 +188,8 @@ export async function POST(request: Request) {
 
     const addressCiphertext = encryptPII(addressPayload);
 
+    const validActorId = await resolveEmployeeId(actorId, 'SALES');
+
     // Duplicate detection check via hash
     const existing = await db.customer.findFirst({
       where: {
@@ -197,7 +200,18 @@ export async function POST(request: Request) {
     let customer;
 
     if (existing) {
-      customer = existing;
+      customer = await db.customer.update({
+        where: { id: existing.id },
+        data: {
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          email: email?.trim() || existing.email,
+          cccdCiphertext,
+          cccdHash,
+          addressCiphertext,
+          verificationStatus: 'PENDING_VERIFICATION'
+        }
+      });
     } else {
       customer = await db.customer.create({
         data: {
@@ -207,12 +221,12 @@ export async function POST(request: Request) {
           cccdCiphertext,
           cccdHash,
           addressCiphertext,
-          verificationStatus: 'DRAFT'
+          verificationStatus: 'PENDING_VERIFICATION'
         }
       });
 
       await createAuditLog({
-        actorId,
+        actorId: validActorId,
         actorName,
         action: 'CREATE_CUSTOMER',
         entityType: 'CUSTOMER',
@@ -221,15 +235,29 @@ export async function POST(request: Request) {
       });
     }
 
-    // Automatically trigger CustomerVerification creation
-    const verification = await db.customerVerification.create({
-      data: {
-        customerId: customer.id,
-        submittedById: actorId,
-        status: 'PENDING',
-        notes: lockId ? `Khai báo thông tin khách gắn với giao dịch cọc lockId: ${lockId}` : 'Khai báo thông tin khách mới'
-      }
+    // Automatically trigger CustomerVerification creation or update
+    let verification = await db.customerVerification.findFirst({
+      where: { customerId: customer.id, status: 'PENDING' }
     });
+
+    if (verification) {
+      verification = await db.customerVerification.update({
+        where: { id: verification.id },
+        data: {
+          submittedById: validActorId,
+          notes: lockId ? `Khai báo cập nhật gắn với lockId: ${lockId}` : 'Khai báo cập nhật thông tin khách hàng'
+        }
+      });
+    } else {
+      verification = await db.customerVerification.create({
+        data: {
+          customerId: customer.id,
+          submittedById: validActorId,
+          status: 'PENDING',
+          notes: lockId ? `Khai báo thông tin khách gắn với giao dịch cọc lockId: ${lockId}` : 'Khai báo thông tin khách mới'
+        }
+      });
+    }
 
     await db.customer.update({
       where: { id: customer.id },

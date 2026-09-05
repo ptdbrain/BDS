@@ -156,6 +156,8 @@ export function ComprehensiveContractModal({
 
       setSuccessMessage('Đã gửi thông tin hợp đồng cho Sales Admin phê duyệt!');
       broadcastSync('CONTRACT_UPDATED');
+      broadcastSync('CUSTOMER_UPDATED');
+      broadcastSync('ALL_DATA_UPDATED');
       setTimeout(() => {
         onSuccess?.();
         onClose();
@@ -185,6 +187,8 @@ export function ComprehensiveContractModal({
 
       setSuccessMessage('Đã duyệt và ký hợp đồng thành công! Doanh số và hoa hồng đã được ghi nhận.');
       broadcastSync('CONTRACT_UPDATED');
+      broadcastSync('CUSTOMER_UPDATED');
+      broadcastSync('ALL_DATA_UPDATED');
       setTimeout(() => {
         onSuccess?.();
         onClose();
@@ -218,6 +222,8 @@ export function ComprehensiveContractModal({
       setSuccessMessage('Đã gửi yêu cầu nhập lại thông tin cho Nhân viên kinh doanh.');
       setIsRejectPromptOpen(false);
       broadcastSync('CONTRACT_UPDATED');
+      broadcastSync('CUSTOMER_UPDATED');
+      broadcastSync('ALL_DATA_UPDATED');
       setTimeout(() => {
         onSuccess?.();
         onClose();

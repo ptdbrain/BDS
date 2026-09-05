@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { encryptPII, hashPII } from '@/lib/security';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function PUT(
   request: Request,
@@ -48,13 +49,31 @@ export async function PUT(
       updateData.addressCiphertext = encryptPII(addressPayload);
     }
 
+    updateData.verificationStatus = 'PENDING_VERIFICATION';
+
+    const validActorId = await resolveEmployeeId(actorId, 'SALES');
+
     const updated = await db.customer.update({
       where: { id },
       data: updateData
     });
 
+    let verification = await db.customerVerification.findFirst({
+      where: { customerId: id, status: 'PENDING' }
+    });
+    if (!verification) {
+      await db.customerVerification.create({
+        data: {
+          customerId: id,
+          submittedById: validActorId,
+          status: 'PENDING',
+          notes: 'Cập nhật lại thông tin hồ sơ khách hàng'
+        }
+      }).catch(() => {});
+    }
+
     await createAuditLog({
-      actorId,
+      actorId: validActorId,
       actorName,
       action: 'UPDATE_CUSTOMER_PII',
       entityType: 'CUSTOMER',

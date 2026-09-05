@@ -29,12 +29,14 @@ import { broadcastSync } from '@/lib/sync';
 interface CustomerManagerProps {
   customers: any[];
   currentRole: UserRole;
+  currentUser?: any;
   onRefresh: () => void;
 }
 
 export function CustomerManager({
   customers,
   currentRole,
+  currentUser,
   onRefresh
 }: CustomerManagerProps) {
   const [revealPII, setRevealPII] = useState<boolean>(false);
@@ -96,7 +98,11 @@ export function CustomerManager({
         const res = await fetch('/api/v1/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify({
+            ...formData,
+            actorId: currentUser?.id || 'NV001',
+            actorName: currentUser?.fullName || 'Nguyễn Minh Khôi'
+          })
         });
         const data = await res.json();
 
@@ -163,7 +169,10 @@ export function CustomerManager({
       const res = await fetch(`/api/v1/customer-verifications/${verId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reviewerId: 'emp_admin_01', reviewerName: 'Phạm Thị Mai' })
+        body: JSON.stringify({
+          reviewerId: currentUser?.id || 'NV007',
+          reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)'
+        })
       });
       if (res.ok) {
         setSelectedVerification(null);
@@ -193,8 +202,8 @@ export function CustomerManager({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          reviewerId: 'emp_admin_01',
-          reviewerName: 'Phạm Thị Mai',
+          reviewerId: currentUser?.id || 'NV007',
+          reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
           notes: changeReason,
           issues: [{ field: 'cccd', code: 'VERIFICATION_REQUIRED', message: changeReason }]
         })

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
   request: Request,
@@ -8,7 +9,7 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { reviewerId = 'emp_admin_01', reviewerName = 'Phạm Thị Mai', notes = 'Thông tin CCCD và hợp đồng hợp lệ' } = body;
+    const { reviewerId = 'NV007', reviewerName = 'Vũ Mai Phương (Sales Admin)', notes = 'Thông tin CCCD và hợp đồng hợp lệ' } = body;
 
     const verification = await db.customerVerification.findUnique({
       where: { id: params.id },
@@ -19,11 +20,13 @@ export async function POST(
       return NextResponse.json({ error: 'Verification record not found' }, { status: 404 });
     }
 
+    const validReviewerId = await resolveEmployeeId(reviewerId, 'SALES_ADMIN');
+
     await db.customerVerification.update({
       where: { id: params.id },
       data: {
         status: 'APPROVED',
-        reviewedById: reviewerId,
+        reviewedById: validReviewerId,
         notes
       }
     });

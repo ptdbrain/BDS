@@ -336,7 +336,17 @@ export function ContractWorkflow({
                           : 'Chưa ký'}
                       </td>
                       <td className="p-3.5">
-                        {signingStatus === 'DA_KY' ? (
+                        {ct.status === 'PENDING_REVIEW' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-black bg-amber-500 text-slate-950 flex items-center gap-1 w-max animate-pulse shadow-md shadow-amber-500/20">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>Chờ Duyệt HĐ</span>
+                          </span>
+                        ) : ct.status === 'CHANGE_REQUESTED' ? (
+                          <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                            <AlertTriangle className="w-3 h-3 text-rose-400" />
+                            <span>Yêu Cầu Nhập Lại</span>
+                          </span>
+                        ) : signingStatus === 'DA_KY' ? (
                           <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
                             <Sparkles className="w-3 h-3 text-purple-300" />
                             <span>Đã Ký</span>
@@ -380,13 +390,23 @@ export function ContractWorkflow({
                         )}
                       </td>
                       <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          onClick={() => setComprehensiveContractData({ isOpen: true, contract: ct, product: ct.product })}
-                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-accent-cyan text-white hover:brightness-110 text-[11px] font-bold transition shadow-md"
-                          title="Mở bảng thông tin toàn bộ hợp đồng (Lớp Sản Phẩm + Lớp Hợp Đồng)"
-                        >
-                          Hợp Đồng Toàn Bộ
-                        </button>
+                        {isSalesAdmin && ct.status === 'PENDING_REVIEW' ? (
+                          <button
+                            onClick={() => setComprehensiveContractData({ isOpen: true, contract: ct, product: ct.product })}
+                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-[11px] shadow-lg shadow-amber-500/30 transition animate-pulse"
+                            title="Sales Admin Duyệt thông tin hợp đồng & khách hàng"
+                          >
+                            🔎 Duyệt Hợp Đồng
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setComprehensiveContractData({ isOpen: true, contract: ct, product: ct.product })}
+                            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-accent-cyan text-white hover:brightness-110 text-[11px] font-bold transition shadow-md"
+                            title="Mở bảng thông tin toàn bộ hợp đồng (Lớp Sản Phẩm + Lớp Hợp Đồng)"
+                          >
+                            Hợp Đồng Toàn Bộ
+                          </button>
+                        )}
 
                         <button
                           onClick={() => handleExportContractPDF(ct)}
