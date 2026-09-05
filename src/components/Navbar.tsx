@@ -72,7 +72,7 @@ export function Navbar({
       icon: ShieldCheck
     },
     MANAGER: {
-      label: 'Giám Đốc / Ban Báo Cáo',
+      label: 'Giám Đốc',
       name: currentUser?.fullName || 'Trần Gia Bảo (NV010)',
       title: currentUser?.jobTitle || 'Ban Lãnh Đạo / Quản Lý',
       color: 'from-emerald-500 to-teal-500',

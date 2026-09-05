@@ -97,7 +97,7 @@ export function Sidebar({
     {
       id: 'reports' as TabType,
       label: 'Báo Cáo',
-      desc: 'Tiến độ bán & tỷ lệ hấp thụ',
+      desc: '',
       icon: BarChart3,
       badge: null
     }
@@ -170,7 +170,7 @@ export function Sidebar({
     {
       id: 'reports' as TabType,
       label: 'Báo Cáo',
-      desc: 'Doanh thu & Xuất PDF',
+      desc: '',
       icon: BarChart3,
       badge: null
     }
@@ -215,9 +215,11 @@ export function Sidebar({
                 </div>
                 <div>
                   <div className="text-xs font-bold">{item.label}</div>
-                  <div className={`text-[10px] ${isActive ? 'text-brand-100' : 'text-slate-500'}`}>
-                    {item.desc}
-                  </div>
+                  {item.desc ? (
+                    <div className={`text-[10px] ${isActive ? 'text-brand-100' : 'text-slate-500'}`}>
+                      {item.desc}
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

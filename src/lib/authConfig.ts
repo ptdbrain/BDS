@@ -105,14 +105,14 @@ export const SSO_ACCOUNTS: SSOAccountConfig[] = [
   {
     code: 'NV010',
     fullName: 'Trần Gia Bảo',
-    jobTitle: 'Giám đốc / Ban Báo Cáo',
+    jobTitle: 'Giám Đốc',
     departmentName: 'Ban Giám Đốc',
     role: 'MANAGER',
     email: 'nv010@ahs.com.vn',
     phone: '0912.010.010',
     avatarText: 'GB',
     color: 'from-emerald-500 to-teal-500',
-    badgeLabel: 'BAN GIÁM ĐỐC / QUẢN TRỊ',
+    badgeLabel: 'BAN GIÁM ĐỐC',
     badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     description: 'Toàn quyền điều hành cao cấp. Xem toàn bộ 3 Mẫu Báo Cáo Chuẩn AHS, bảng xếp hạng nhân viên và tiến độ bán hàng dự án.',
     permissions: [
