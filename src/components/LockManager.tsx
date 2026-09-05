@@ -15,13 +15,19 @@ import {
   ShieldCheck,
   Eye,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Sparkles,
+  Timer,
+  User,
+  Phone,
+  Check
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 
 interface LockManagerProps {
   locks: any[];
+  bookings?: any[];
   onRefresh: () => void;
   onCancelLock: (lockId: string) => void;
   onProceedToCustomer: (lock: any) => void;
@@ -31,6 +37,7 @@ interface LockManagerProps {
 
 export function LockManager({
   locks,
+  bookings = [],
   onRefresh,
   onCancelLock,
   onProceedToCustomer,
@@ -38,6 +45,7 @@ export function LockManager({
   currentUser
 }: LockManagerProps) {
   const [isConfirmingTransfer, setIsConfirmingTransfer] = useState<string | null>(null);
+  const [isApprovingBooking, setIsApprovingBooking] = useState<string | null>(null);
   const [selectedLockForQR, setSelectedLockForQR] = useState<any | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
@@ -168,6 +176,55 @@ export function LockManager({
     }
   };
 
+  // Sales Admin confirms Booking 50M Deposit -> Sets DANG_KHOP & starts 10m countdown
+  const handleApproveBooking = async (bookingId: string) => {
+    setIsApprovingBooking(bookingId);
+    setActionSuccessMsg(null);
+    try {
+      const res = await fetch(`/api/v1/bookings/${bookingId}/approve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorId: currentUser?.id || 'emp_sales_admin',
+          actorName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc Booking 50.000.000 VNĐ hợp lệ'
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Xác nhận thanh toán cọc thất bại');
+        return;
+      }
+
+      setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Khung giờ khớp căn (10 phút) đã được kích hoạt cho Sales.');
+      onRefresh();
+      broadcastSync('BOOKING_UPDATED');
+      broadcastSync('ALL_DATA_UPDATED');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsApprovingBooking(null);
+    }
+  };
+
+  // 10-minute matching window countdown calculator (đơn vị phút)
+  const getMatchingMinutesRemaining = (tgKetthuc: string | Date | null | undefined) => {
+    if (!tgKetthuc) return { text: '0 phút', minutes: 0, isExpired: true };
+    const diffMs = new Date(tgKetthuc).getTime() - now;
+    if (diffMs <= 0) return { text: '0 phút (Hết hạn)', minutes: 0, isExpired: true };
+    const minutes = Math.ceil(diffMs / 60000);
+    return { text: `${minutes} phút`, minutes, isExpired: false };
+  };
+
+  // Group bookings
+  const pendingBookings = (bookings || []).filter(
+    (b) => b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
+  );
+  const activeMatchingBookings = (bookings || []).filter(
+    (b) => b.trangthaikhopcan === 'DANG_KHOP' && b.tgKetthuckhopcan && new Date(b.tgKetthuckhopcan).getTime() > now
+  );
+
   return (
     <div className="space-y-6">
       {/* Top Header Banner */}
@@ -183,8 +240,8 @@ export function LockManager({
                   {currentRole === 'PRODUCT_ADMIN'
                     ? 'Danh Mục Giao Dịch (Khóa Căn & Thanh Toán) - Chỉ Xem'
                     : currentRole === 'SALES_ADMIN'
-                    ? 'Danh Mục Giao Dịch - Xác Nhận Tiền Chuyển Khoản'
-                    : 'Quản Lý Khóa Căn 30 Phút & Thanh Toán Cọc'}
+                    ? 'Danh Mục Giao Dịch - Duyệt Cọc Booking & Xác Nhận Chuyển Khoản'
+                    : 'Quản Lý Booking, Khóa Căn & Thanh Toán Cọc'}
                 </h2>
                 {currentRole === 'PRODUCT_ADMIN' && (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-amber-400 border border-amber-500/30">
@@ -199,10 +256,10 @@ export function LockManager({
               </div>
               <p className="text-xs text-slate-400">
                 {currentRole === 'PRODUCT_ADMIN'
-                  ? 'Theo dõi thời gian khóa giữ căn 30 phút và tình trạng thanh toán của quỹ hàng (không thao tác xác nhận).'
+                  ? 'Theo dõi lượt booking, thời gian khóa giữ căn và tình trạng thanh toán (chế độ chỉ xem).'
                   : currentRole === 'SALES_ADMIN'
-                  ? 'Kiểm tra tiền về tài khoản, nhấn xác nhận để chuyển căn từ Lock sang Đã Bán.'
-                  : 'Tự động đối soát chuyển khoản VietQR & giải phóng căn hết hạn'}
+                  ? 'Xác nhận cọc Booking (50M) để kích hoạt 10 phút khớp căn cho Sales, hoặc duyệt cọc căn 30 phút.'
+                  : 'Theo dõi tiến trình cọc VietQR, duyệt booking và giải phóng căn hết hạn'}
               </p>
             </div>
           </div>
@@ -231,6 +288,145 @@ export function LockManager({
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {/* 1. TOP PRIORITY: PENDING BOOKINGS WAITING FOR SALES ADMIN DEPOSIT APPROVAL */}
+      {pendingBookings.length > 0 && (
+        <div className="p-5 rounded-3xl bg-gradient-to-br from-amber-950/50 via-slate-900 to-slate-950 border-2 border-amber-500/70 shadow-2xl space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-500/30 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <span className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
+                  <span>Yêu Cầu Xác Nhận Cọc Booking VietQR (50.000.000 VNĐ)</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950">
+                    {pendingBookings.length} CẦN DUYỆT
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-300/80">
+                  NVKD đã xác nhận khách thanh toán cọc. Sales Admin nhấn duyệt để kích hoạt <strong className="text-white">10 PHÚT KHỚP CĂN</strong>!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {pendingBookings.map((b) => (
+              <div
+                key={b.id}
+                className="p-4 rounded-2xl bg-slate-900/90 border border-amber-500/40 space-y-3 shadow-lg hover:border-amber-400 transition"
+              >
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 font-mono text-xs font-black">
+                    #{String(b.sttBooking).padStart(3, '0')} - {b.maLuotBooking}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold animate-pulse">
+                    Chờ Duyệt Cọc
+                  </span>
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Dự án:</span>
+                    <span className="font-bold text-white">{b.project?.name || 'AHS Grand Horizon'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Khách hàng:</span>
+                    <span className="font-bold text-emerald-400">{b.customerName || 'Khách Booking'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Số điện thoại:</span>
+                    <span className="font-mono text-slate-300">{b.customerPhone || '0988888888'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Số tiền cọc:</span>
+                    <span className="font-bold text-amber-400">{(b.depositAmount || 50000000).toLocaleString('vi-VN')} VND</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Sales phụ trách:</span>
+                    <span className="font-bold text-slate-200">{b.salesEmployee?.fullName || 'Nguyễn Minh Khôi'}</span>
+                  </div>
+                  {b.notes && (
+                    <div className="pt-1 text-[11px] text-slate-400 italic">
+                      Ghi chú: {b.notes}
+                    </div>
+                  )}
+                </div>
+
+                <div className="pt-2 border-t border-slate-800">
+                  {currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? (
+                    <button
+                      onClick={() => handleApproveBooking(b.id)}
+                      disabled={isApprovingBooking === b.id}
+                      className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      <span>{isApprovingBooking === b.id ? 'Đang duyệt...' : 'Xác Nhận Đã Nhận Cọc ➔ Kích Hoạt 10 Phút'}</span>
+                    </button>
+                  ) : (
+                    <div className="py-2 px-3 rounded-xl bg-slate-800/80 text-center text-slate-400 text-xs font-semibold flex items-center justify-center space-x-1.5">
+                      <Clock className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Đang chờ Sales Admin xác nhận cọc</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 2. ACTIVE MATCHING BOOKINGS (10 MINUTES COUNTDOWN) */}
+      {activeMatchingBookings.length > 0 && (
+        <div className="p-5 rounded-3xl bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 border border-emerald-500/50 space-y-4 animate-in fade-in">
+          <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
+            <div className="flex items-center space-x-2.5">
+              <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                <Timer className="w-5 h-5 animate-pulse" />
+              </span>
+              <div>
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center space-x-2">
+                  <span>Lượt Booking Đang Khớp Căn (Thời gian khớp: 10 Phút)</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                </h3>
+                <p className="text-xs text-emerald-300/80">
+                  Sales phụ trách có quyền nhấn Lock căn bất kỳ trong thời gian này để chuyển thẳng sang ĐÃ BÁN (Không cần QR).
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {activeMatchingBookings.map((b) => {
+              const timer = getMatchingMinutesRemaining(b.tgKetthuckhopcan);
+              return (
+                <div key={b.id} className="p-4 rounded-2xl bg-slate-900 border border-emerald-500/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-black text-white">
+                      #{String(b.sttBooking).padStart(3, '0')} - {b.maLuotBooking}
+                    </span>
+                    <div className="px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono text-xs font-black flex items-center space-x-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Còn {timer.text}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1 text-xs text-slate-300">
+                    <div>Khách hàng: <strong className="text-white">{b.customerName}</strong> ({b.customerPhone})</div>
+                    <div>Sales: <strong className="text-slate-200">{b.salesEmployee?.fullName || 'NVKD'}</strong></div>
+                    <div>Dự án: <strong className="text-slate-200">{b.project?.name}</strong></div>
+                  </div>
+                  <div className="pt-2">
+                    <span className="inline-block w-full py-2 px-3 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-center text-emerald-300 text-[11px] font-bold">
+                      ⚡ Sang Bảng Hàng để nhấn Lock căn ngay
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -437,6 +633,118 @@ export function LockManager({
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* ALL BOOKINGS TABLE */}
+      <div className="space-y-4 pt-4 border-t border-slate-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Sparkles className="w-5 h-5 text-amber-400" />
+            <h3 className="text-base font-bold text-white">Bảng Quản Lý Booking & Khớp Căn Hệ Thống</h3>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+              {(bookings || []).length} lượt
+            </span>
+          </div>
+          <span className="text-xs text-amber-400/90 font-medium">
+            Tiền cọc giữ chỗ: 50.000.000 VNĐ / lượt (Thời hạn khớp căn: 10 phút)
+          </span>
+        </div>
+
+        <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-slate-900/90 text-slate-400 font-bold border-b border-slate-800">
+                <tr>
+                  <th className="p-3.5">STT</th>
+                  <th className="p-3.5">Mã Booking</th>
+                  <th className="p-3.5">Dự Án</th>
+                  <th className="p-3.5">Khách Hàng</th>
+                  <th className="p-3.5">Tiền Cọc</th>
+                  <th className="p-3.5">Trạng Thái Khớp Căn</th>
+                  <th className="p-3.5">Sales Phụ Trách</th>
+                  <th className="p-3.5 text-right">Thao Tác</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-200">
+                {(bookings || []).length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="p-8 text-center text-slate-500">
+                      Chưa có dữ liệu Booking nào trong hệ thống
+                    </td>
+                  </tr>
+                ) : (
+                  (bookings || []).map((b: any) => {
+                    const isPending = b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP';
+                    const isMatching = b.trangthaikhopcan === 'DANG_KHOP';
+                    const isMatched = b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp';
+                    const isExpired = b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian';
+
+                    return (
+                      <tr key={b.id} className="hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 font-mono font-black text-amber-400">
+                          #{String(b.sttBooking).padStart(3, '0')}
+                        </td>
+                        <td className="p-3.5 font-mono font-bold text-white">
+                          {b.maLuotBooking}
+                        </td>
+                        <td className="p-3.5 text-slate-300">
+                          {b.project?.name || 'AHS Grand Horizon'}
+                        </td>
+                        <td className="p-3.5">
+                          <div className="font-semibold text-white">{b.customerName || 'Khách hàng'}</div>
+                          <div className="text-[11px] text-slate-400">{b.customerPhone}</div>
+                        </td>
+                        <td className="p-3.5 font-bold text-amber-400">
+                          {(b.depositAmount || 50000000).toLocaleString('vi-VN')} VND
+                        </td>
+                        <td className="p-3.5">
+                          {isPending ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              Chờ Duyệt Cọc
+                            </span>
+                          ) : isMatching ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-500 text-slate-950 animate-pulse">
+                              ⚡ Đang Khớp ({getMatchingMinutesRemaining(b.tgKetthuckhopcan).text})
+                            </span>
+                          ) : isMatched ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-purple-500/20 text-purple-400 border border-purple-500/40">
+                              ✓ Đã Khớp Căn
+                            </span>
+                          ) : isExpired ? (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                              Hết Thời Gian
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700">
+                              {b.trangthaikhopcan || 'Chưa khớp'}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-3.5 text-slate-400">
+                          {b.salesEmployee?.fullName || 'Nguyễn Minh Khôi'}
+                        </td>
+                        <td className="p-3.5 text-right whitespace-nowrap">
+                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPending ? (
+                            <button
+                              onClick={() => handleApproveBooking(b.id)}
+                              disabled={isApprovingBooking === b.id}
+                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[11px] uppercase shadow-md flex items-center space-x-1 transition ml-auto"
+                            >
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              <span>{isApprovingBooking === b.id ? 'Đang duyệt...' : 'Duyệt Cọc (Kích Hoạt 10m)'}</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-500 text-[11px]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

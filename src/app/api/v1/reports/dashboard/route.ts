@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { sweepExpiredLocks } from '@/lib/locks';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   try {
     await ensureDatabaseSeeded();

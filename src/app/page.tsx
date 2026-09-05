@@ -31,6 +31,7 @@ export default function Home() {
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [products, setProducts] = useState<any[]>([]);
   const [locks, setLocks] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
@@ -109,6 +110,17 @@ export default function Home() {
     }
   };
 
+  // Fetch Bookings (Realtime Booking turns & 10m Matching Window)
+  const fetchBookings = async () => {
+    try {
+      const res = await fetch('/api/v1/bookings');
+      const data = await res.json();
+      if (data.data) setBookings(data.data);
+    } catch (err) {
+      console.error('Failed to fetch bookings', err);
+    }
+  };
+
   // Fetch Customers
   const fetchCustomers = async () => {
     try {
@@ -146,6 +158,7 @@ export default function Home() {
   const refreshAllData = useCallback(() => {
     fetchProducts();
     fetchLocks();
+    fetchBookings();
     fetchCustomers();
     fetchContracts();
     fetchReportData();
@@ -334,6 +347,7 @@ export default function Home() {
   }
 
   const activeLocksCount = locks.filter(l => l.status === 'ACTIVE' || l.status === 'PAYMENT_PENDING').length;
+  const pendingBookingsCount = bookings.filter(b => b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP').length;
   const pendingVerificationsCount = customers.filter(c => c.verificationStatus === 'PENDING_VERIFICATION').length;
   const pendingContractsCount = contracts.filter(c => c.status === 'PENDING_REVIEW').length;
 
@@ -358,6 +372,7 @@ export default function Home() {
           activeLocksCount={activeLocksCount}
           pendingVerificationsCount={pendingVerificationsCount}
           pendingContractsCount={pendingContractsCount}
+          pendingBookingsCount={pendingBookingsCount}
         />
 
         <main className="flex-1 p-6 overflow-y-auto max-w-7xl mx-auto w-full">
@@ -389,6 +404,7 @@ export default function Home() {
           {activeTab === 'locks' && (
             <LockManager
               locks={locks}
+              bookings={bookings}
               onRefresh={refreshAllData}
               onCancelLock={handleCancelLock}
               onProceedToCustomer={handleProceedToCustomer}

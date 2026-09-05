@@ -28,6 +28,7 @@ interface SidebarProps {
   activeLocksCount: number;
   pendingVerificationsCount: number;
   pendingContractsCount: number;
+  pendingBookingsCount?: number;
 }
 
 interface NavItem {
@@ -45,7 +46,8 @@ export function Sidebar({
   currentRole = 'SALES',
   activeLocksCount,
   pendingVerificationsCount,
-  pendingContractsCount
+  pendingContractsCount,
+  pendingBookingsCount = 0
 }: SidebarProps) {
   // 1. Sales Agent: 3 items strictly
   const salesNavItems: NavItem[] = [
@@ -107,14 +109,15 @@ export function Sidebar({
   // - Giao dịch (khoá căn + ttoan): hiển thị căn lock, có nút xác nhận chuyển khoản -> chuyển Đã bán.
   // - Thông tin khách hàng: tất cả KH giao dịch + căn đính kèm, duyệt / yêu cầu sửa, xuất file CĐT.
   // - Danh mục hợp đồng: nhập HĐ từ CĐT, thời gian ký, trạng thái ký, doanh số, hoa hồng -> chuyển về cho Sales.
+  const salesAdminTotalPendingLocks = activeLocksCount + pendingBookingsCount;
   const salesAdminNavItems: NavItem[] = [
     {
       id: 'locks' as TabType,
       label: '1. Giao Dịch (Khóa Căn & T.Toán)',
       desc: 'Xác nhận chuyển khoản → Đã bán',
       icon: Clock,
-      badge: activeLocksCount > 0 ? activeLocksCount : null,
-      badgeColor: 'bg-amber-500'
+      badge: salesAdminTotalPendingLocks > 0 ? salesAdminTotalPendingLocks : null,
+      badgeColor: pendingBookingsCount > 0 ? 'bg-rose-500' : 'bg-amber-500'
     },
     {
       id: 'customers' as TabType,

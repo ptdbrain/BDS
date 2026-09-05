@@ -124,10 +124,8 @@ export function InventoryMatrix({
   };
 
   useEffect(() => {
-    if (projectSubTab === 'booking' || isProjectUnreleased) {
-      fetchBookings();
-    }
-  }, [selectedProjectId, projectSubTab]);
+    fetchBookings();
+  }, [selectedProjectId]);
 
   // Realtime cross-tab sync listener
   useEffect(() => {
@@ -285,6 +283,14 @@ export function InventoryMatrix({
     if (!b.tgKetthuckhopcan) return false;
     return new Date(b.tgKetthuckhopcan).getTime() > nowTime;
   });
+
+  // Pending booking waiting for deposit confirmation in this project
+  const pendingBookingInProject = bookings.find((b) =>
+    b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
+  );
+  const allPendingBookings = bookings.filter((b) =>
+    b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
+  );
 
   // Calculate remaining matching minutes
   const matchingMinutesRemaining = activeMatchingBooking?.tgKetthuckhopcan
@@ -529,6 +535,16 @@ export function InventoryMatrix({
               </span>
             )}
           </button>
+
+          {currentRole === 'SALES' && (
+            <button
+              onClick={() => setIsBookingModalOpen(true)}
+              className="ml-auto px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black uppercase flex items-center space-x-2 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Thêm Lượt Booking (50M)</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -769,6 +785,46 @@ export function InventoryMatrix({
             </div>
           )}
 
+          {/* Pending Booking Awaiting Approval Banner */}
+          {!activeMatchingBooking && pendingBookingInProject && (
+            <div className="glass-panel p-4 rounded-2xl border-2 border-amber-500/70 bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 animate-pulse shrink-0">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-black text-white uppercase tracking-wider">
+                      Lượt Booking Đang Chờ Xác Nhận Cọc 50.000.000 VNĐ
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 uppercase">
+                      Chờ Duyệt Cọc
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1">
+                    Booking <strong className="text-amber-300">#{String(pendingBookingInProject.sttBooking).padStart(3, '0')} - {pendingBookingInProject.maLuotBooking}</strong> của khách hàng <strong className="text-white">{pendingBookingInProject.customerName}</strong> ({pendingBookingInProject.customerPhone}).
+                  </p>
+                  <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
+                    {currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER'
+                      ? 'Sales Admin nhấn duyệt bên phải để lập tức kích hoạt 10 PHÚT KHỚP CĂN cho Sales.'
+                      : 'Đang chờ Sales Admin xác nhận nhận tiền cọc trong mục Giao Dịch để kích hoạt 10 phút khớp căn.'}
+                  </p>
+                </div>
+              </div>
+
+              {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && (
+                <button
+                  onClick={() => handleApproveBooking(pendingBookingInProject.id)}
+                  disabled={isApprovingBooking === pendingBookingInProject.id}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition shrink-0"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{isApprovingBooking === pendingBookingInProject.id ? 'Đang duyệt...' : 'Duyệt Cọc Ngay ➔ Bật 10 Phút'}</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* Status KPI Summary Chips */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div className="glass-panel p-3.5 rounded-xl border border-slate-800 flex items-center justify-between">
@@ -893,12 +949,20 @@ export function InventoryMatrix({
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        if (allPendingBookings.length > 0) {
+                                          const proceed = confirm(
+                                            `Đang có ${allPendingBookings.length} lượt Booking chờ Sales Admin xác nhận cọc 50M!\n\n` +
+                                            `• Nếu muốn Khớp Căn trực tiếp sang ĐÃ BÁN (không cần QR), vui lòng nhờ Sales Admin duyệt cọc booking.\n` +
+                                            `• Nhấn OK nếu bạn vẫn muốn Khóa giữ chỗ 30 phút thông thường (quét VietQR cọc 100M).`
+                                          );
+                                          if (!proceed) return;
+                                        }
                                         onLockProduct(prod.id);
                                       }}
                                       className="w-full mt-2 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[11px] uppercase flex items-center justify-center space-x-1 shadow-md hover:from-amber-400 hover:to-orange-400 transition"
                                     >
                                       <Lock className="w-3.5 h-3.5" />
-                                      <span>Lock</span>
+                                      <span>Lock 30m</span>
                                     </button>
                                   )
                                 )}
@@ -977,10 +1041,20 @@ export function InventoryMatrix({
                               </button>
                             ) : (
                               <button
-                                onClick={() => onLockProduct(prod.id)}
-                                className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[11px] uppercase transition shadow-md"
+                                onClick={() => {
+                                  if (allPendingBookings.length > 0) {
+                                    const proceed = confirm(
+                                      `Đang có ${allPendingBookings.length} lượt Booking chờ Sales Admin xác nhận cọc 50M!\n\n` +
+                                      `• Nếu muốn Khớp Căn trực tiếp sang ĐÃ BÁN (không cần QR), vui lòng nhờ Sales Admin duyệt cọc booking.\n` +
+                                      `• Nhấn OK nếu bạn vẫn muốn Khóa giữ chỗ 30 phút thông thường (quét VietQR cọc 100M).`
+                                    );
+                                    if (!proceed) return;
+                                  }
+                                  onLockProduct(prod.id);
+                                }}
+                                className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[11px] uppercase transition shadow-md hover:from-amber-400 hover:to-orange-400"
                               >
-                                Lock
+                                Lock 30m
                               </button>
                             )
                           )}
