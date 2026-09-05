@@ -417,48 +417,66 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
   return (
     <div className="space-y-6">
       {/* 1. Header Banner Doanh Nghiệp AHS Chuẩn */}
-      <div className="glass-panel p-6 rounded-2xl border border-slate-800 shadow-2xl relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-brand-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+      <div className="relative overflow-hidden rounded-3xl border border-slate-800/80 bg-gradient-to-br from-slate-900/95 via-slate-900/80 to-slate-950 p-6 md:p-8 shadow-2xl backdrop-blur-2xl">
+        {/* Ambient Glow Effects */}
+        <div className="absolute -right-16 -top-16 w-80 h-80 bg-brand-500/15 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute -left-16 -bottom-16 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="space-y-2">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="space-y-3">
             <div className="flex items-center space-x-3">
-              <div className="px-2.5 py-1 rounded-lg bg-brand-500/20 text-brand-400 font-mono text-xs font-black border border-brand-500/30">
-                AHS PROPERTY
+              <div className="px-3 py-1 rounded-xl bg-gradient-to-r from-brand-500/20 to-emerald-500/20 text-brand-400 font-mono text-xs font-black border border-brand-500/40 shadow-sm flex items-center space-x-1.5">
+                <Building2 className="w-3.5 h-3.5 text-brand-400" />
+                <span>AHS PROPERTY</span>
               </div>
-              <span className="text-xs text-slate-400">Hệ Thống Báo Cáo & Quản Trị Bất Động Sản</span>
+              <span className="text-xs font-medium text-slate-400 tracking-wide">Hệ Thống Báo Cáo & Quản Trị Bất Động Sản Chuẩn Doanh Nghiệp</span>
             </div>
-            <h1 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">
+
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-100 to-slate-300 uppercase">
               {company.name}
             </h1>
-            <div className="text-xs text-slate-400 space-y-0.5">
-              <p>📍 {company.address}</p>
-              <p>☎️ Hotline: <span className="text-brand-400 font-semibold">{company.phone}</span> | 🌐 Website: <a href={company.sourceLink} target="_blank" rel="noreferrer" className="text-slate-300 hover:text-brand-400 underline">{company.sourceLink}</a></p>
+
+            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-slate-400">
+              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-300">
+                <span>📍</span>
+                <span>{company.address}</span>
+              </span>
+              <span className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-950/70 border border-slate-800/80 text-slate-300">
+                <span>☎️</span>
+                <span>Hotline: <strong className="text-brand-400 font-semibold">{company.phone}</strong></span>
+              </span>
+              <a
+                href={company.sourceLink}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-brand-500/40 text-slate-300 hover:text-brand-300 transition"
+              >
+                <span>🌐</span>
+                <span>{company.sourceLink}</span>
+              </a>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={onRefresh}
-              className="p-2.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition"
+              className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-white hover:border-brand-500/50 hover:bg-slate-800 shadow-lg transition active:scale-95"
               title="Làm mới số liệu"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
 
-            {/* Nút Xuất Excel */}
             <button
               onClick={handleExportExcel}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 hover:from-emerald-500 hover:to-teal-500 flex items-center space-x-2 transition"
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 text-white text-xs font-bold shadow-xl shadow-emerald-600/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2 transition border border-emerald-400/30"
             >
               <FileSpreadsheet className="w-4 h-4" />
               <span>Xuất Excel (.xlsx)</span>
             </button>
 
-            {/* Nút Xuất PDF */}
             <button
               onClick={handleExportPDF}
-              className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 text-white text-xs font-bold shadow-lg shadow-blue-600/20 hover:from-blue-500 hover:to-cyan-500 flex items-center space-x-2 transition"
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white text-xs font-bold shadow-xl shadow-blue-600/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2 transition border border-blue-400/30"
             >
               <FileText className="w-4 h-4" />
               <span>Xuất PDF Chuẩn</span>
@@ -466,48 +484,48 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
           </div>
         </div>
 
-        {/* Thông tin lập báo cáo */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800/80 px-3 py-1.5 rounded-xl">
-              <span className="text-slate-400">Người lập:</span>
-              <span className="font-semibold text-slate-100">{company.creator}</span>
+        {/* Thông tin lập báo cáo toolbar */}
+        <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center space-x-2 bg-slate-950/70 border border-slate-800 px-3.5 py-2 rounded-xl">
+              <span className="text-slate-500">Người lập:</span>
+              <span className="font-bold text-slate-100">{company.creator}</span>
             </div>
 
             {/* Ngày lập - Realtime Indicator */}
-            <div className="flex items-center space-x-2 bg-slate-900/80 border border-slate-800/80 px-3 py-1.5 rounded-xl">
-              <span className="relative flex h-2 w-2">
+            <div className="flex items-center space-x-2.5 bg-slate-950/70 border border-slate-800 px-3.5 py-2 rounded-xl">
+              <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
               </span>
-              <span className="text-slate-400">Ngày lập:</span>
-              <span className="font-bold text-slate-100">{realtimeDate}</span>
-              <span className="text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 uppercase tracking-wider">
+              <span className="text-slate-500">Ngày lập:</span>
+              <span className="font-extrabold text-white tracking-wide">{realtimeDate}</span>
+              <span className="text-[10px] text-emerald-400 font-black px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 uppercase tracking-wider">
                 Realtime
               </span>
             </div>
           </div>
 
           {/* Thời gian thống kê - Interactive Date Picker (Từ ngày -> Đến ngày) */}
-          <div className="flex flex-wrap items-center gap-2 bg-slate-900/90 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-inner">
-            <Calendar className="w-3.5 h-3.5 text-brand-400" />
-            <span className="text-slate-400 font-medium">Thời gian thống kê:</span>
+          <div className="flex flex-wrap items-center gap-2.5 bg-slate-950/80 border border-slate-800 px-4 py-2 rounded-2xl shadow-inner">
+            <Calendar className="w-4 h-4 text-brand-400" />
+            <span className="text-slate-400 font-semibold">Thời gian thống kê:</span>
             <div className="flex items-center space-x-2">
               <span className="text-slate-500 text-[11px] font-medium">Từ</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-slate-950 border border-slate-700/80 hover:border-brand-500/60 rounded-lg px-2.5 py-1 text-xs text-brand-300 font-semibold focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition cursor-pointer"
+                className="bg-slate-900 border border-slate-700/90 hover:border-brand-500/80 rounded-xl px-3 py-1.5 text-xs text-brand-300 font-bold focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition cursor-pointer"
                 title="Chọn ngày bắt đầu"
               />
-              <span className="text-brand-400 font-bold">➔</span>
+              <span className="text-brand-400 font-black text-sm">➔</span>
               <span className="text-slate-500 text-[11px] font-medium">Đến</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-slate-950 border border-slate-700/80 hover:border-brand-500/60 rounded-lg px-2.5 py-1 text-xs text-brand-300 font-semibold focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition cursor-pointer"
+                className="bg-slate-900 border border-slate-700/90 hover:border-brand-500/80 rounded-xl px-3 py-1.5 text-xs text-brand-300 font-bold focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition cursor-pointer"
                 title="Chọn ngày kết thúc"
               />
             </div>
@@ -516,13 +534,13 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
       </div>
 
       {/* 2. Navigation Tabs - 3 Mẫu Báo Cáo + KPI Dashboard */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
+      <div className="p-1.5 bg-slate-900/90 border border-slate-800/90 rounded-2xl flex flex-wrap gap-1.5 shadow-xl backdrop-blur-xl">
         <button
           onClick={() => setActiveTab('bc_doanhthu')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+          className={`flex items-center space-x-2.5 px-5 py-3 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'bc_doanhthu'
-              ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-gradient-to-r from-brand-600 to-blue-600 text-white shadow-lg shadow-brand-500/25 border border-brand-400/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
           }`}
         >
           <TrendingUp className="w-4 h-4" />
@@ -531,10 +549,10 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
         <button
           onClick={() => setActiveTab('bc_sanpham_duan')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+          className={`flex items-center space-x-2.5 px-5 py-3 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'bc_sanpham_duan'
-              ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-gradient-to-r from-brand-600 to-blue-600 text-white shadow-lg shadow-brand-500/25 border border-brand-400/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
           }`}
         >
           <Building2 className="w-4 h-4" />
@@ -543,10 +561,10 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
         <button
           onClick={() => setActiveTab('bc_doanhso_nv')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+          className={`flex items-center space-x-2.5 px-5 py-3 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'bc_doanhso_nv'
-              ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-gradient-to-r from-brand-600 to-blue-600 text-white shadow-lg shadow-brand-500/25 border border-brand-400/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
           }`}
         >
           <Users className="w-4 h-4" />
@@ -555,10 +573,10 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
         <button
           onClick={() => setActiveTab('kpi_dashboard')}
-          className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-bold transition ${
+          className={`flex items-center space-x-2.5 px-5 py-3 rounded-xl text-xs font-bold transition-all ${
             activeTab === 'kpi_dashboard'
-              ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/20'
-              : 'bg-slate-900/60 text-slate-400 hover:text-white hover:bg-slate-800'
+              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/25 border border-purple-400/30'
+              : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
@@ -572,29 +590,42 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
       {activeTab === 'bc_doanhthu' && (
         <div className="space-y-6">
           {/* KPI Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Tổng Doanh Thu Hợp Đồng</span>
-              <div className="text-2xl font-black text-emerald-400">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Tổng Doanh Thu Hợp Đồng</span>
+              <div className="text-3xl font-black text-emerald-400 font-mono mt-2 tracking-tight">
                 {formatVND(report1.summary.totalRevenue)}
               </div>
-              <p className="text-[11px] text-slate-400">Tương đương ~ {formatBillion(report1.summary.totalRevenue)}</p>
-            </div>
-
-            <div className="glass-panel p-5 rounded-2xl border border-blue-500/30 bg-blue-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Tổng Số Hợp Đồng Đã Ký</span>
-              <div className="text-2xl font-black text-white">
-                {report1.summary.totalContracts} <span className="text-sm font-normal text-slate-400">Hợp đồng</span>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Tương đương:</span>
+                <span className="font-bold text-emerald-300 font-mono">~ {formatBillion(report1.summary.totalRevenue)}</span>
               </div>
-              <p className="text-[11px] text-slate-400">Khớp chuẩn 100% với các lượt cọc</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-purple-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-purple-400 uppercase tracking-wider">Giá Trị HĐ Bình Quân</span>
-              <div className="text-2xl font-black text-purple-300">
+            <div className="relative overflow-hidden rounded-2xl border border-blue-500/30 bg-gradient-to-br from-blue-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-blue-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-cyan-400"></div>
+              <span className="text-[11px] font-black text-blue-400 uppercase tracking-widest">Tổng Số Hợp Đồng Đã Ký</span>
+              <div className="text-3xl font-black text-white font-mono mt-2 tracking-tight flex items-baseline space-x-2">
+                <span>{report1.summary.totalContracts}</span>
+                <span className="text-sm font-medium text-slate-400">Hợp đồng</span>
+              </div>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Tỷ lệ khớp:</span>
+                <span className="font-bold text-blue-300">100% khớp căn & cọc</span>
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-purple-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
+              <span className="text-[11px] font-black text-purple-400 uppercase tracking-widest">Giá Trị HĐ Bình Quân</span>
+              <div className="text-3xl font-black text-purple-300 font-mono mt-2 tracking-tight">
                 {formatVND(report1.summary.avgContractValue)}
               </div>
-              <p className="text-[11px] text-slate-400">Mức giá trung bình mỗi giao dịch thành công</p>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Mức trung bình:</span>
+                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report1.summary.avgContractValue)} / HĐ</span>
+              </div>
             </div>
           </div>
 
@@ -713,37 +744,68 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
       {activeTab === 'bc_sanpham_duan' && (
         <div className="space-y-6">
           {/* KPI Indicators */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-1">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Tổng Sản Phẩm Toàn Quỹ</span>
-              <div className="text-2xl font-black text-white">{report2.summary.totalUnits} <span className="text-xs text-slate-400 font-normal">căn</span></div>
-              <p className="text-[10px] text-slate-500">Gồm 6 dự án phân phối</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/90 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-slate-700 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-500 to-slate-400"></div>
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Tổng Sản Phẩm Toàn Quỹ</span>
+              <div className="text-3xl font-black text-white font-mono mt-2 tracking-tight">
+                {report2.summary.totalUnits} <span className="text-xs text-slate-400 font-normal">căn</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-2">Gồm 6 dự án chiến lược</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase">Còn Hàng Mở Bán</span>
-              <div className="text-2xl font-black text-emerald-400">{report2.summary.availableUnits} <span className="text-xs text-emerald-400/80 font-normal">căn</span></div>
-              <p className="text-[10px] text-slate-500">Sẵn sàng giao dịch</p>
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-wider">Còn Hàng Mở Bán</span>
+              <div className="text-3xl font-black text-emerald-400 font-mono mt-2 tracking-tight">
+                {report2.summary.availableUnits} <span className="text-xs text-emerald-300/70 font-normal">căn</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Sẵn sàng phân phối & cọc</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-purple-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-purple-400 uppercase">Đã Bán & Đã Khớp</span>
-              <div className="text-2xl font-black text-purple-400">{report2.summary.soldUnits} <span className="text-xs text-purple-400/80 font-normal">căn</span></div>
-              <p className="text-[10px] text-slate-500">Đã thanh toán cọc / HĐ</p>
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-purple-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
+              <span className="text-[11px] font-black text-purple-400 uppercase tracking-wider">Đã Bán & Đã Khớp</span>
+              <div className="text-3xl font-black text-purple-300 font-mono mt-2 tracking-tight">
+                {report2.summary.soldUnits} <span className="text-xs text-purple-300/70 font-normal">căn</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Đã thanh toán cọc & ký HĐ</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-accent-cyan uppercase">Tỷ Lệ Bán Toàn Quỹ</span>
-              <div className="text-2xl font-black text-accent-cyan">{report2.summary.totalSoldRate}</div>
-              <p className="text-[10px] text-slate-500">Tốc độ hấp thụ tổng thể</p>
+            <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-cyan-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-400"></div>
+              <span className="text-[11px] font-black text-cyan-400 uppercase tracking-wider">Tỷ Lệ Hấp Thụ Quỹ</span>
+              <div className="text-3xl font-black text-cyan-300 font-mono mt-2 tracking-tight">
+                {report2.summary.totalSoldRate}
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">Tốc độ tiêu thụ toàn hệ thống</p>
             </div>
           </div>
 
           {/* Biểu đồ so sánh sản phẩm theo dự án */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-              Tỷ Lệ Bán & Cơ Cấu Quỹ Căn Từng Dự Án
-            </h3>
+          <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                  Tỷ Lệ Bán & Cơ Cấu Quỹ Căn Từng Dự Án
+                </h3>
+                <p className="text-xs text-slate-400">So sánh số lượng căn tổng, đã bán/khớp và căn còn mở bán</p>
+              </div>
+              <div className="flex items-center space-x-4 text-xs">
+                <span className="flex items-center space-x-1.5 text-slate-400">
+                  <span className="w-3 h-3 rounded bg-slate-600"></span>
+                  <span>Tổng căn</span>
+                </span>
+                <span className="flex items-center space-x-1.5 text-purple-400">
+                  <span className="w-3 h-3 rounded bg-purple-500"></span>
+                  <span>Đã bán</span>
+                </span>
+                <span className="flex items-center space-x-1.5 text-emerald-400">
+                  <span className="w-3 h-3 rounded bg-emerald-500"></span>
+                  <span>Còn hàng</span>
+                </span>
+              </div>
+            </div>
 
             <div className="h-64 w-full pt-4">
               <ResponsiveContainer width="100%" height="100%">
@@ -752,71 +814,79 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                   <XAxis dataKey="name" stroke="#94a3b8" fontSize={11} />
                   <YAxis stroke="#94a3b8" fontSize={11} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '14px', fontSize: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
                     formatter={(val: any, name: any) => [val, name === 'sold' ? 'Đã bán / khớp' : name === 'available' ? 'Còn hàng' : 'Tổng số căn']}
                   />
-                  <Bar dataKey="total" name="total" fill="#475569" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="sold" name="sold" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="available" name="available" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="total" name="total" fill="#475569" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="sold" name="sold" fill="#8b5cf6" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="available" name="available" fill="#10b981" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Bảng Dữ Liệu Chuẩn Mẫu BC_SanPham_DuAn */}
-          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+          <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 shadow-2xl backdrop-blur-xl">
+            <div className="p-5 border-b border-slate-800/80 flex items-center justify-between bg-slate-900/60">
               <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider">
                   BÁO CÁO LƯỢNG SẢN PHẨM BÁN THEO DỰ ÁN (BC_SANPHAM_DUAN)
                 </h4>
                 <p className="text-[11px] text-slate-400">Theo dõi quỹ hàng và tỷ lệ bán của từng dự án</p>
               </div>
-              <span className="text-xs font-mono text-slate-400">6 Dự án phân phối</span>
+              <span className="text-xs font-mono font-bold text-brand-400 bg-brand-500/10 border border-brand-500/20 px-2.5 py-1 rounded-lg">
+                6 Dự án phân phối
+              </span>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
+                <thead className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[11px]">
                   <tr>
-                    <th className="p-3.5">Mã Dự Án</th>
-                    <th className="p-3.5">Tên Dự Án</th>
-                    <th className="p-3.5 text-right">Tổng Sản Phẩm</th>
-                    <th className="p-3.5 text-right">Còn Hàng</th>
-                    <th className="p-3.5 text-right">Đang Lock</th>
-                    <th className="p-3.5 text-right">Đã Bán</th>
-                    <th className="p-3.5 text-right">Tỷ Lệ Bán</th>
+                    <th className="p-4">Mã Dự Án</th>
+                    <th className="p-4">Tên Dự Án</th>
+                    <th className="p-4 text-right">Tổng Sản Phẩm</th>
+                    <th className="p-4 text-right">Còn Hàng</th>
+                    <th className="p-4 text-right">Đang Lock</th>
+                    <th className="p-4 text-right">Đã Bán</th>
+                    <th className="p-4 text-right">Tỷ Lệ Bán</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80 text-slate-200">
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
                   {(report2.data || []).map((p: any) => (
-                    <tr key={p.maDA} className="hover:bg-slate-800/40 transition">
-                      <td className="p-3.5 font-bold font-mono text-brand-400">{p.maDA}</td>
-                      <td className="p-3.5 font-semibold text-white">
-                        <div>{p.tenDA}</div>
+                    <tr key={p.maDA} className="hover:bg-slate-800/40 transition-colors even:bg-slate-900/30">
+                      <td className="p-4 font-bold font-mono text-brand-400">
+                        <span className="px-2 py-0.5 rounded-md bg-brand-500/10 border border-brand-500/20 font-mono">
+                          {p.maDA}
+                        </span>
+                      </td>
+                      <td className="p-4 font-semibold text-white">
+                        <div className="font-bold text-slate-100">{p.tenDA}</div>
                         <div className="text-[10px] text-slate-400">{p.location}</div>
                       </td>
-                      <td className="p-3.5 text-right font-mono font-bold text-slate-100">
+                      <td className="p-4 text-right font-mono font-bold text-slate-100">
                         {p.totalUnits}
                       </td>
-                      <td className="p-3.5 text-right font-mono text-emerald-400 font-semibold">
+                      <td className="p-4 text-right font-mono text-emerald-400 font-semibold">
                         {p.availableUnits}
                       </td>
-                      <td className="p-3.5 text-right font-mono text-amber-400">
+                      <td className="p-4 text-right font-mono text-amber-400">
                         {p.lockedUnits}
                       </td>
-                      <td className="p-3.5 text-right font-mono font-bold text-purple-400">
+                      <td className="p-4 text-right font-mono font-bold text-purple-400">
                         {p.soldUnits}
                       </td>
-                      <td className="p-3.5 text-right font-mono font-black text-cyan-400">
-                        {p.formattedSoldRate}
+                      <td className="p-4 text-right font-mono">
+                        <span className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/30 font-black text-cyan-300">
+                          {p.formattedSoldRate}
+                        </span>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                <tfoot className="bg-slate-900/90 font-black border-t-2 border-slate-700 text-white">
+                <tfoot className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 font-black border-t-2 border-slate-700 text-white shadow-lg">
                   <tr>
-                    <td className="p-4 uppercase text-brand-400" colSpan={2}>TỔNG CỘNG</td>
+                    <td className="p-4 uppercase text-brand-400 font-bold" colSpan={2}>TỔNG CỘNG</td>
                     <td className="p-4 text-right font-mono text-slate-100 text-sm">
                       {report2.summary.totalUnits}
                     </td>
@@ -829,7 +899,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                     <td className="p-4 text-right font-mono text-purple-400 text-sm">
                       {report2.summary.soldUnits}
                     </td>
-                    <td className="p-4 text-right font-mono text-cyan-400 text-sm">
+                    <td className="p-4 text-right font-mono text-cyan-300 text-sm font-black">
                       {report2.summary.totalSoldRate}
                     </td>
                   </tr>
@@ -853,36 +923,48 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
       {activeTab === 'bc_doanhso_nv' && (
         <div className="space-y-6">
           {/* KPI Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-emerald-400 uppercase">Tổng Doanh Số Nhân Viên</span>
-              <div className="text-2xl font-black text-emerald-400">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
+              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Tổng Doanh Số Nhân Viên</span>
+              <div className="text-3xl font-black text-emerald-400 font-mono mt-2 tracking-tight">
                 {formatVND(report3.summary.totalRevenue)}
               </div>
-              <p className="text-[11px] text-slate-400">Đóng góp từ 24 hợp đồng giao dịch</p>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Nguồn hợp đồng:</span>
+                <span className="font-bold text-emerald-300 font-mono">24 HĐ giao dịch</span>
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-amber-500/30 bg-amber-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-amber-400 uppercase">Tổng Hoa Hồng Kinh Doanh (1%)</span>
-              <div className="text-2xl font-black text-amber-400">
+            <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-amber-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-400"></div>
+              <span className="text-[11px] font-black text-amber-400 uppercase tracking-widest">Tổng Hoa Hồng Kinh Doanh (1%)</span>
+              <div className="text-3xl font-black text-amber-400 font-mono mt-2 tracking-tight">
                 {formatVND(report3.summary.totalCommission)}
               </div>
-              <p className="text-[11px] text-slate-400">Quyền lợi chi trả cho chuyên viên kinh doanh</p>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Chế độ thưởng:</span>
+                <span className="font-bold text-amber-300">Chi trả chuyên viên KD</span>
+              </div>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-purple-950/10 space-y-1">
-              <span className="text-[11px] font-bold text-purple-400 uppercase">Doanh Số Bình Quân / HĐ</span>
-              <div className="text-2xl font-black text-purple-300">
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-purple-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
+              <span className="text-[11px] font-black text-purple-400 uppercase tracking-widest">Doanh Số Bình Quân / HĐ</span>
+              <div className="text-3xl font-black text-purple-300 font-mono mt-2 tracking-tight">
                 {formatVND(report3.summary.avgRevenuePerContract)}
               </div>
-              <p className="text-[11px] text-slate-400">Quy mô trung bình mỗi thương vụ</p>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Quy mô thương vụ:</span>
+                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report3.summary.avgRevenuePerContract)} / HĐ</span>
+              </div>
             </div>
           </div>
 
           {/* Biểu đồ Top Nhân Viên Xuất Sắc */}
-          <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-              <Award className="w-4 h-4 text-amber-400" />
+          <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2 border-b border-slate-800/80 pb-3">
+              <Award className="w-5 h-5 text-amber-400" />
               <span>Top Chiến Thần Doanh Số Nhân Viên Kinh Doanh</span>
             </h3>
 
@@ -893,20 +975,20 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                   <XAxis type="number" stroke="#94a3b8" fontSize={11} tickFormatter={(val) => `${val} Tỷ`} />
                   <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={100} />
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', fontSize: '12px' }}
+                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '14px', fontSize: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
                     formatter={(val: any) => [`${val} Tỷ VND`, 'Tổng doanh số']}
                   />
-                  <Bar dataKey="revenueBillion" fill="#38bdf8" radius={[0, 6, 6, 0]} />
+                  <Bar dataKey="revenueBillion" fill="#38bdf8" radius={[0, 8, 8, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           {/* Bảng Dữ Liệu Chuẩn Mẫu BC_DoanhSo_NV */}
-          <div className="glass-panel rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900/60">
+          <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 shadow-2xl backdrop-blur-xl">
+            <div className="p-5 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60">
               <div>
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                <h4 className="text-xs font-black text-white uppercase tracking-wider">
                   BÁO CÁO DOANH SỐ THEO NHÂN VIÊN (BC_DOANHSO_NV)
                 </h4>
                 <p className="text-[11px] text-slate-400">Đánh giá kết quả kinh doanh theo nhân viên phụ trách (15 nhân sự)</p>
@@ -914,67 +996,95 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
               {/* Tìm kiếm nhân viên */}
               <div className="relative">
-                <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
                 <input
                   type="text"
-                  placeholder="Tìm nhân viên NV001, tên..."
+                  placeholder="Tìm theo mã NV, tên..."
                   value={searchEmployee}
                   onChange={(e) => setSearchEmployee(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 text-xs text-white pl-9 pr-3 py-1.5 rounded-xl outline-none focus:border-brand-500 w-56"
+                  className="bg-slate-950 border border-slate-700/90 text-xs text-white pl-10 pr-4 py-2 rounded-xl outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 w-64 transition"
                 />
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
+                <thead className="bg-slate-950 text-slate-400 font-bold border-b border-slate-800 uppercase tracking-wider text-[11px]">
                   <tr>
-                    <th className="p-3.5">Mã NV</th>
-                    <th className="p-3.5">Họ Tên Nhân Viên</th>
-                    <th className="p-3.5">Chức Vụ & Phòng Ban</th>
-                    <th className="p-3.5 text-right">Số Hợp Đồng</th>
-                    <th className="p-3.5 text-right">Tổng Doanh Số (VND)</th>
-                    <th className="p-3.5 text-right">Tổng Hoa Hồng (VND)</th>
-                    <th className="p-3.5 text-right">Doanh Số / HĐ (VND)</th>
+                    <th className="p-4">Xếp Hạng</th>
+                    <th className="p-4">Mã NV</th>
+                    <th className="p-4">Họ Tên Nhân Viên</th>
+                    <th className="p-4">Chức Vụ & Phòng Ban</th>
+                    <th className="p-4 text-right">Số HĐ</th>
+                    <th className="p-4 text-right">Tổng Doanh Số (VND)</th>
+                    <th className="p-4 text-right">Hoa Hồng 1% (VND)</th>
+                    <th className="p-4 text-right">Doanh Số / HĐ (VND)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/80 text-slate-200">
-                  {filteredEmployees.map((e: any) => (
-                    <tr key={e.employeeId || e.maNV} className={`hover:bg-slate-800/40 transition ${e.contractsCount > 0 ? 'bg-slate-900/30' : ''}`}>
-                      <td className="p-3.5 font-bold font-mono text-brand-400">{e.maNV}</td>
-                      <td className="p-3.5 font-bold text-white">{e.fullName}</td>
-                      <td className="p-3.5">
-                        <div className="font-medium text-slate-300">{e.jobTitle}</div>
-                        <div className="text-[10px] text-slate-500">{e.departmentName}</div>
-                      </td>
-                      <td className="p-3.5 text-right font-mono font-bold text-amber-400">
-                        {e.contractsCount}
-                      </td>
-                      <td className="p-3.5 text-right font-mono font-bold text-emerald-400">
-                        {formatVND(e.totalRevenue)}
-                      </td>
-                      <td className="p-3.5 text-right font-mono text-cyan-400">
-                        {formatVND(e.totalCommission)}
-                      </td>
-                      <td className="p-3.5 text-right font-mono text-slate-300">
-                        {formatVND(e.avgRevenuePerContract)}
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-slate-800/60 text-slate-200">
+                  {filteredEmployees.map((e: any, idx: number) => {
+                    const rank = idx + 1;
+                    return (
+                      <tr key={e.employeeId || e.maNV} className="hover:bg-slate-800/40 transition-colors even:bg-slate-900/30">
+                        <td className="p-4">
+                          {rank === 1 ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-xs">
+                              <span>🥇</span>
+                              <span>#1</span>
+                            </span>
+                          ) : rank === 2 ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-300/20 text-slate-200 border border-slate-400/40 font-black text-xs">
+                              <span>🥈</span>
+                              <span>#2</span>
+                            </span>
+                          ) : rank === 3 ? (
+                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-700/20 text-amber-500 border border-amber-600/40 font-black text-xs">
+                              <span>🥉</span>
+                              <span>#3</span>
+                            </span>
+                          ) : (
+                            <span className="font-mono text-slate-400 font-bold px-2">#{rank}</span>
+                          )}
+                        </td>
+                        <td className="p-4 font-bold font-mono text-brand-400">
+                          <span className="px-2 py-0.5 rounded-md bg-brand-500/10 border border-brand-500/20 font-mono">
+                            {e.maNV}
+                          </span>
+                        </td>
+                        <td className="p-4 font-bold text-white text-xs">{e.fullName}</td>
+                        <td className="p-4">
+                          <div className="font-medium text-slate-300">{e.jobTitle}</div>
+                          <div className="text-[10px] text-slate-400">{e.departmentName}</div>
+                        </td>
+                        <td className="p-4 text-right font-mono font-bold text-amber-400">
+                          {e.contractsCount}
+                        </td>
+                        <td className="p-4 text-right font-mono font-bold text-emerald-400">
+                          {formatVND(e.totalRevenue)}
+                        </td>
+                        <td className="p-4 text-right font-mono text-cyan-400 font-semibold">
+                          {formatVND(e.totalCommission)}
+                        </td>
+                        <td className="p-4 text-right font-mono text-slate-300">
+                          {formatVND(e.avgRevenuePerContract)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
-                <tfoot className="bg-slate-900/90 font-black border-t-2 border-slate-700 text-white">
+                <tfoot className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 font-black border-t-2 border-slate-700 text-white shadow-lg">
                   <tr>
-                    <td className="p-4 uppercase text-brand-400" colSpan={3}>TỔNG CỘNG TOÀN BỘ NHÂN SỰ</td>
+                    <td className="p-4 uppercase text-brand-400 font-bold" colSpan={4}>TỔNG CỘNG TOÀN BỘ NHÂN SỰ</td>
                     <td className="p-4 text-right font-mono text-amber-400 text-sm">
                       {report3.summary.totalContracts}
                     </td>
                     <td className="p-4 text-right font-mono text-emerald-400 text-sm">
                       {formatVND(report3.summary.totalRevenue)}
                     </td>
-                    <td className="p-4 text-right font-mono text-cyan-400 text-sm">
+                    <td className="p-4 text-right font-mono text-cyan-300 text-sm">
                       {formatVND(report3.summary.totalCommission)}
                     </td>
-                    <td className="p-4 text-right font-mono text-purple-300">
+                    <td className="p-4 text-right font-mono text-purple-300 text-sm">
                       {formatVND(report3.summary.avgRevenuePerContract)}
                     </td>
                   </tr>
@@ -991,45 +1101,49 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
       {activeTab === 'kpi_dashboard' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="glass-panel p-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/10 space-y-2">
+            <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all space-y-2">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Tổng Doanh Số Hợp Đồng</span>
                 <DollarSign className="w-4 h-4 text-emerald-400" />
               </div>
-              <div className="text-2xl font-black text-emerald-400">
+              <div className="text-2xl font-black text-emerald-400 font-mono">
                 {formatBillion(kpis.totalContractRevenue)}
               </div>
               <p className="text-[11px] text-slate-400">24 Hợp đồng đã xác nhận ký kết</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-cyan-500/30 bg-cyan-950/10 space-y-2">
+            <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-cyan-500/50 transition-all space-y-2">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-400"></div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Doanh Thu Cọc VietQR</span>
                 <CheckCircle className="w-4 h-4 text-accent-cyan" />
               </div>
-              <div className="text-2xl font-black text-accent-cyan">
+              <div className="text-2xl font-black text-accent-cyan font-mono">
                 {formatBillion(kpis.totalDepositRevenue)}
               </div>
               <p className="text-[11px] text-slate-400">24 lượt thanh toán cọc thành công</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-purple-500/30 bg-purple-950/10 space-y-2">
+            <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/80 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-purple-500/50 transition-all space-y-2">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Tỷ Lệ Bán Ra Toàn Quỹ</span>
                 <TrendingUp className="w-4 h-4 text-purple-400" />
               </div>
-              <div className="text-2xl font-black text-purple-400">
+              <div className="text-2xl font-black text-purple-300 font-mono">
                 {kpis.conversionRate}%
               </div>
               <p className="text-[11px] text-slate-400">46 căn đã khớp / đã bán trên 219 căn</p>
             </div>
 
-            <div className="glass-panel p-5 rounded-2xl border border-slate-800 space-y-2">
+            <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-br from-slate-900/90 to-slate-950 p-5 shadow-xl backdrop-blur-xl group hover:border-slate-700 transition-all space-y-2">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-slate-500 to-slate-400"></div>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-400 uppercase">Số Nhân Sự Kinh Doanh</span>
                 <Users className="w-4 h-4 text-brand-400" />
               </div>
-              <div className="text-2xl font-black text-white">
+              <div className="text-2xl font-black text-white font-mono">
                 15 <span className="text-xs text-slate-400 font-normal">nhân viên</span>
               </div>
               <p className="text-[11px] text-slate-400">9 chuyên viên ghi nhận doanh số</p>
@@ -1038,8 +1152,8 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Pie Chart: Status Breakdown */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+            <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider border-b border-slate-800/80 pb-3">
                 Cơ Cấu Trạng Thái Quỹ Hàng (219 Căn)
               </h3>
               <div className="h-64">
@@ -1058,7 +1172,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px' }} />
+                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '14px', fontSize: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1066,20 +1180,20 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
             </div>
 
             {/* Leaderboard Summary */}
-            <div className="glass-panel p-6 rounded-2xl border border-slate-800 space-y-4">
-              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                <Award className="w-4 h-4 text-amber-400" />
+            <div className="relative overflow-hidden rounded-3xl border border-slate-800/90 bg-gradient-to-br from-slate-900/90 to-slate-950 p-6 shadow-2xl backdrop-blur-xl space-y-4">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2 border-b border-slate-800/80 pb-3">
+                <Award className="w-5 h-5 text-amber-400" />
                 <span>Bảng Xếp Hạng Doanh Số Nhân Viên (Top 5)</span>
               </h3>
 
               <div className="space-y-3">
                 {(reportData?.leaderboard || []).slice(0, 5).map((emp: any, idx: number) => (
-                  <div key={emp.id || emp.maNV} className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs ${
+                  <div key={emp.id || emp.maNV} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-brand-500/40 transition-colors shadow-sm">
+                    <div className="flex items-center space-x-3.5">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shadow-md ${
                         idx === 0 ? 'bg-amber-500 text-slate-950' :
                         idx === 1 ? 'bg-slate-300 text-slate-950' :
-                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-400'
+                        idx === 2 ? 'bg-amber-700 text-white' : 'bg-slate-800 text-slate-300'
                       }`}>
                         #{idx + 1}
                       </div>
@@ -1089,7 +1203,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-black text-emerald-400 text-xs">{formatBillion(emp.totalRevenue)}</div>
+                      <div className="font-black text-emerald-400 text-xs font-mono">{formatBillion(emp.totalRevenue)}</div>
                       <div className="text-[10px] text-slate-500">Doanh số</div>
                     </div>
                   </div>
