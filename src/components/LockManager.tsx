@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
 import { UserRole } from '@/lib/types';
 import {
+  Edit,
   Clock,
   QrCode,
   CheckCircle,
@@ -45,6 +46,9 @@ export function LockManager({
   currentUser
 }: LockManagerProps) {
   const [isConfirmingTransfer, setIsConfirmingTransfer] = useState<string | null>(null);
+  const [isConfirmingPaymentSales, setIsConfirmingPaymentSales] = useState<boolean>(false);
+  const [editingBooking, setEditingBooking] = useState<any | null>(null);
+  const [isSavingBookingEdit, setIsSavingBookingEdit] = useState<boolean>(false);
   const [isApprovingBooking, setIsApprovingBooking] = useState<string | null>(null);
   const [selectedLockForQR, setSelectedLockForQR] = useState<any | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
@@ -144,6 +148,68 @@ export function LockManager({
   };
 
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
+
+  // Sales confirms customer paid 100M deposit
+  const handleSalesConfirmPayment = async (lockId: string) => {
+    setIsConfirmingPaymentSales(true);
+    setActionSuccessMsg(null);
+    try {
+      const res = await fetch(`/api/v1/locks/${lockId}/confirm-payment-sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          actorId: currentUser?.id || 'emp_sales_01',
+          actorName: currentUser?.fullName || 'Trần Văn Nam (Sales)',
+          notes: 'Nhân viên kinh doanh xác nhận khách hàng đã nộp cọc 100.000.000 VNĐ'
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Xác nhận cọc thất bại');
+        return;
+      }
+
+      setActionSuccessMsg(data.message || 'Đã gửi xác nhận cọc cho Sales Admin đối soát!');
+      setSelectedLockForQR(null);
+      onRefresh();
+      broadcastSync('ALL_DATA_UPDATED');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsConfirmingPaymentSales(false);
+    }
+  };
+
+  // Update Booking Info
+  const handleUpdateBookingInfo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBooking) return;
+    setIsSavingBookingEdit(true);
+    try {
+      const res = await fetch(`/api/v1/bookings/${editingBooking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: editingBooking.customerName,
+          customerPhone: editingBooking.customerPhone,
+          notes: editingBooking.notes
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Lưu thất bại');
+        return;
+      }
+      setEditingBooking(null);
+      onRefresh();
+      broadcastSync('BOOKING_UPDATED');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi kết nối máy chủ');
+    } finally {
+      setIsSavingBookingEdit(false);
+    }
+  };
 
   // Sales Admin confirms transfer received -> converts product status to SOLD directly
   const handleAdminConfirmTransfer = async (lockId: string) => {
@@ -541,22 +607,38 @@ export function LockManager({
                     </div>
                   ) : (
                     // SALES & OTHER: Standard Sales Action Buttons
-                    <div className="flex items-center space-x-2 pt-2">
-                      <button
-                        onClick={() => setSelectedLockForQR(lock)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-accent-cyan text-white text-xs font-extrabold uppercase flex items-center justify-center space-x-1.5 shadow-lg hover:brightness-110 transition"
-                      >
-                        <QrCode className="w-4 h-4" />
-                        <span>Tạo QR VietQR</span>
-                      </button>
+                    <div className="space-y-2 pt-2">
+                      {lock.status === 'PAYMENT_PENDING' ? (
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center text-amber-300 font-bold text-xs flex items-center justify-center space-x-1.5 animate-pulse">
+                          <Clock className="w-4 h-4" />
+                          <span>Đã Gửi Xác Nhận Cọc 100M (Chờ Admin Duyệt)</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedLockForQR(lock)}
+                          className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-brand-600 to-accent-cyan text-white text-xs font-extrabold uppercase flex items-center justify-center space-x-1.5 shadow-lg hover:brightness-110 transition"
+                        >
+                          <QrCode className="w-4 h-4" />
+                          <span>Hiển Thị QR & Xác Nhận Cọc 100M</span>
+                        </button>
+                      )}
 
-                      <button
-                        onClick={() => onCancelLock(lock.id)}
-                        className="py-2 px-3 rounded-xl bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition"
-                        title="Hủy Lock"
-                      >
-                        Hủy Lock
-                      </button>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedLockForQR(lock)}
+                          className="flex-1 py-1.5 px-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-semibold flex items-center justify-center space-x-1 transition"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Xem Lại QR</span>
+                        </button>
+                        <button
+                          onClick={() => onCancelLock(lock.id)}
+                          className="py-1.5 px-3 rounded-lg bg-slate-900 border border-slate-700 text-slate-400 hover:text-rose-400 text-xs font-semibold transition"
+                          title="Hủy Lock"
+                        >
+                          Hủy Lock
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -724,18 +806,25 @@ export function LockManager({
                         <td className="p-3.5 text-slate-400">
                           {b.salesEmployee?.fullName || 'Nguyễn Minh Khôi'}
                         </td>
-                        <td className="p-3.5 text-right whitespace-nowrap">
-                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPending ? (
+                        <td className="p-3.5 text-right whitespace-nowrap space-x-1.5">
+                          <button
+                            onClick={() => setEditingBooking(b)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-[11px] inline-flex items-center space-x-1 transition border border-slate-700"
+                            title="Sửa thông tin khách hàng booking"
+                          >
+                            <Edit className="w-3 h-3" />
+                            <span>Sửa TT Booking</span>
+                          </button>
+
+                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPending && (
                             <button
                               onClick={() => handleApproveBooking(b.id)}
                               disabled={isApprovingBooking === b.id}
-                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[11px] uppercase shadow-md flex items-center space-x-1 transition ml-auto"
+                              className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-[11px] uppercase shadow-md inline-flex items-center space-x-1 transition"
                             >
                               <CheckCircle className="w-3.5 h-3.5" />
-                              <span>{isApprovingBooking === b.id ? 'Đang duyệt...' : 'Duyệt Cọc (Kích Hoạt 10m)'}</span>
+                              <span>{isApprovingBooking === b.id ? 'Đang duyệt...' : 'Duyệt Cọc'}</span>
                             </button>
-                          ) : (
-                            <span className="text-slate-500 text-[11px]">—</span>
                           )}
                         </td>
                       </tr>
@@ -794,6 +883,16 @@ export function LockManager({
                     Nội dung: {selectedLockForQR.payments?.[0]?.providerReference || 'AHS-A0302'}
                   </div>
                 </div>
+
+                {/* Sales Confirm Payment Button */}
+                <button
+                  onClick={() => handleSalesConfirmPayment(selectedLockForQR.id)}
+                  disabled={isConfirmingPaymentSales}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-500/20 transition"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{isConfirmingPaymentSales ? 'Đang gửi...' : 'Nhân Viên KD: Xác Nhận Khách Đã Nộp Cọc 100M'}</span>
+                </button>
               </div>
 
               {/* SIMULATED BANK WEBHOOK PANEL */}
@@ -877,6 +976,79 @@ export function LockManager({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT BOOKING MODAL */}
+      {editingBooking && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
+          <div className="glass-panel w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Edit className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base font-bold text-white">
+                  Chỉnh Sửa Thông Tin Lượt Booking #{editingBooking.thutukhopcan || editingBooking.id.slice(-4)}
+                </h3>
+              </div>
+              <button
+                onClick={() => setEditingBooking(null)}
+                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateBookingInfo} className="space-y-3.5 text-xs">
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Họ và Tên Khách Hàng (*)</label>
+                <input
+                  type="text"
+                  required
+                  value={editingBooking.customerName || ''}
+                  onChange={(e) => setEditingBooking({ ...editingBooking, customerName: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl outline-none focus:border-amber-500 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Số Điện Thoại (*)</label>
+                <input
+                  type="tel"
+                  required
+                  value={editingBooking.customerPhone || ''}
+                  onChange={(e) => setEditingBooking({ ...editingBooking, customerPhone: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-white px-3 py-2 rounded-xl outline-none focus:border-amber-500 font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-bold mb-1">Ghi Chú Nguyện Vọng Căn</label>
+                <textarea
+                  rows={3}
+                  value={editingBooking.notes || ''}
+                  onChange={(e) => setEditingBooking({ ...editingBooking, notes: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end space-x-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setEditingBooking(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingBookingEdit}
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black uppercase shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
+                >
+                  {isSavingBookingEdit ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

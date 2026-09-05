@@ -28,13 +28,14 @@ export async function GET(
   }
 }
 
-export async function PUT(
+export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await request.json();
     const {
+      // Contract fields
       investorContractNo,
       signedDate,
       signingStatus,
@@ -44,46 +45,122 @@ export async function PUT(
       commissionAmount,
       investorNotes,
       status,
-      actorId = 'emp_admin_01',
-      actorName = 'Phạm Thị Mai'
+      // HopDong class diagram fields
+      maHopdong,
+      maKH,
+      hotenKH,
+      sodienthoaiKH,
+      cccdKH,
+      emailKH,
+      diachiKH,
+      phuonganthanhtoan,
+      giahopdong,
+      doanhso,
+      hoahong,
+      trangthaiThanhtoan,
+      ghichu,
+      salesEmployeeId,
+      actorId = 'emp_sales_01',
+      actorName = 'Nhân viên kinh doanh'
     } = body;
 
+    const existing = await db.contract.findUnique({
+      where: { id: params.id },
+      include: { customer: true }
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Không tìm thấy hợp đồng' }, { status: 404 });
+    }
+
     const dataToUpdate: any = {};
-    if (investorContractNo !== undefined) dataToUpdate.investorContractNo = investorContractNo;
-    if (signedDate !== undefined) {
-      dataToUpdate.signedDate = signedDate ? new Date(signedDate) : null;
-      dataToUpdate.thoigiankiHDMB = signedDate ? new Date(signedDate) : null;
-    }
-    if (signingStatus !== undefined) {
-      dataToUpdate.signingStatus = signingStatus;
-      dataToUpdate.trangthaiHDMB = signingStatus;
-    }
-    if (dealRevenue !== undefined) {
+    if (maHopdong !== undefined) dataToUpdate.maHopdong = maHopdong;
+    if (maKH !== undefined) dataToUpdate.maKH = maKH;
+    if (hotenKH !== undefined) dataToUpdate.hotenKH = hotenKH;
+    if (sodienthoaiKH !== undefined) dataToUpdate.sodienthoaiKH = sodienthoaiKH;
+    if (cccdKH !== undefined) dataToUpdate.cccdKH = cccdKH;
+    if (emailKH !== undefined) dataToUpdate.emailKH = emailKH;
+    if (diachiKH !== undefined) dataToUpdate.diachiKH = diachiKH;
+    if (phuonganthanhtoan !== undefined) dataToUpdate.phuonganthanhtoan = phuonganthanhtoan;
+
+    if (giahopdong !== undefined) {
+      const numPrice = parseFloat(String(giahopdong));
+      dataToUpdate.giahopdong = numPrice;
+      dataToUpdate.agreedPrice = numPrice;
+      dataToUpdate.dealRevenue = numPrice;
+      dataToUpdate.doanhso = numPrice;
+    } else if (dealRevenue !== undefined) {
       const numRevenue = parseFloat(String(dealRevenue));
       dataToUpdate.dealRevenue = numRevenue;
       dataToUpdate.giahopdong = numRevenue;
       dataToUpdate.doanhso = numRevenue;
     }
-    if (commissionStatus !== undefined) {
-      dataToUpdate.commissionStatus = commissionStatus;
-      dataToUpdate.trangthaiThanhtoan = commissionStatus;
-    }
-    if (commissionDueDate !== undefined) dataToUpdate.commissionDueDate = commissionDueDate;
-    if (commissionAmount !== undefined) {
+
+    if (hoahong !== undefined) {
+      const numComm = parseFloat(String(hoahong));
+      dataToUpdate.hoahong = numComm;
+      dataToUpdate.commissionAmount = numComm;
+    } else if (commissionAmount !== undefined) {
       const numComm = parseFloat(String(commissionAmount));
       dataToUpdate.commissionAmount = numComm;
       dataToUpdate.hoahong = numComm;
     }
-    if (investorNotes !== undefined) {
+
+    if (trangthaiThanhtoan !== undefined) {
+      dataToUpdate.trangthaiThanhtoan = trangthaiThanhtoan;
+      dataToUpdate.commissionStatus = trangthaiThanhtoan;
+    } else if (commissionStatus !== undefined) {
+      dataToUpdate.commissionStatus = commissionStatus;
+      dataToUpdate.trangthaiThanhtoan = commissionStatus;
+    }
+
+    if (ghichu !== undefined) {
+      dataToUpdate.ghichu = ghichu;
+      dataToUpdate.investorNotes = ghichu;
+    } else if (investorNotes !== undefined) {
       dataToUpdate.investorNotes = investorNotes;
       dataToUpdate.ghichu = investorNotes;
     }
-    if (status !== undefined) dataToUpdate.status = status;
+
+    if (investorContractNo !== undefined) dataToUpdate.investorContractNo = investorContractNo;
+    if (commissionDueDate !== undefined) dataToUpdate.commissionDueDate = commissionDueDate;
+    if (salesEmployeeId !== undefined) dataToUpdate.salesEmployeeId = salesEmployeeId;
+
+    if (signedDate !== undefined) {
+      dataToUpdate.signedDate = signedDate ? new Date(signedDate) : null;
+      dataToUpdate.thoigiankiHDMB = signedDate ? new Date(signedDate) : null;
+    }
+
+    if (signingStatus !== undefined) {
+      dataToUpdate.signingStatus = signingStatus;
+      dataToUpdate.trangthaiHDMB = signingStatus;
+    }
+
+    if (status !== undefined) {
+      dataToUpdate.status = status;
+    }
 
     // If signingStatus is DA_KY, ensure status is SIGNED and signedAt is set
-    if (signingStatus === 'DA_KY') {
+    if (signingStatus === 'DA_KY' || status === 'SIGNED') {
       dataToUpdate.status = 'SIGNED';
+      dataToUpdate.signingStatus = 'DA_KY';
+      dataToUpdate.trangthaiHDMB = 'Đã ký';
       dataToUpdate.signedAt = signedDate ? new Date(signedDate) : new Date();
+    }
+
+    // Update Customer details if provided
+    if (existing.customerId && (hotenKH || sodienthoaiKH || cccdKH || emailKH || diachiKH)) {
+      await db.customer.update({
+        where: { id: existing.customerId },
+        data: {
+          fullName: hotenKH || existing.customer?.fullName,
+          phone: sodienthoaiKH || existing.customer?.phone,
+          email: emailKH || existing.customer?.email,
+          cccdHash: cccdKH || existing.customer?.cccdHash,
+          cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : existing.customer?.cccdCiphertext,
+          addressCiphertext: diachiKH || existing.customer?.addressCiphertext
+        }
+      }).catch(err => console.error('Error updating customer record:', err));
     }
 
     const updated = await db.contract.update({
@@ -97,7 +174,7 @@ export async function PUT(
       }
     });
 
-    // If signed, transition product to SOLD immediately
+    // If signed, ensure product is SOLD
     if (updated.status === 'SIGNED' || updated.signingStatus === 'DA_KY') {
       await db.product.update({
         where: { id: updated.productId },
@@ -111,17 +188,24 @@ export async function PUT(
     await createAuditLog({
       actorId,
       actorName,
-      action: 'UPDATE_INVESTOR_CONTRACT_INFO',
+      action: 'UPDATE_CONTRACT_INFO',
       entityType: 'CONTRACT',
       entityId: params.id,
       afterJson: dataToUpdate
     });
 
     return NextResponse.json({
-      message: 'Cập nhật thông tin hợp đồng Chủ đầu tư thành công!',
+      message: 'Cập nhật thông tin hợp đồng thành công!',
       data: updated
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: { id: string } }
+) {
+  return PATCH(request, { params });
 }

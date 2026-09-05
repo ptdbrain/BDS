@@ -41,11 +41,26 @@ export async function POST(request: Request) {
       commissionAmount,
       investorNotes,
       salesEmployeeId = 'emp_sales_01',
-      salesEmployeeName = 'Trần Văn Nam'
+      salesEmployeeName = 'Trần Văn Nam',
+      // Fields from ComprehensiveContractModal
+      maHopdong,
+      maKH,
+      hotenKH,
+      sodienthoaiKH,
+      cccdKH,
+      emailKH,
+      diachiKH,
+      phuonganthanhtoan,
+      giahopdong,
+      doanhso,
+      hoahong,
+      trangthaiThanhtoan,
+      ghichu,
+      status: requestedStatus
     } = body;
 
-    if (!productId || !customerId) {
-      return NextResponse.json({ error: 'Sản phẩm và khách hàng là bắt buộc' }, { status: 400 });
+    if (!productId) {
+      return NextResponse.json({ error: 'Sản phẩm là bắt buộc' }, { status: 400 });
     }
 
     const product = await db.product.findUnique({
@@ -53,12 +68,34 @@ export async function POST(request: Request) {
       include: { project: true, prices: true }
     });
 
-    const customer = await db.customer.findUnique({
-      where: { id: customerId }
-    });
+    if (!product) {
+      return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 400 });
+    }
 
-    if (!product || !customer) {
-      return NextResponse.json({ error: 'Không tìm thấy sản phẩm hoặc khách hàng' }, { status: 400 });
+    let resolvedCustomerId = customerId;
+    let customer = null;
+    if (resolvedCustomerId) {
+      customer = await db.customer.findUnique({ where: { id: resolvedCustomerId } });
+    }
+
+    if (!customer) {
+      const custPhone = sodienthoaiKH || '0912345678';
+      const custName = hotenKH || 'Khách Hàng Mới';
+      customer = await db.customer.findFirst({ where: { phone: custPhone } });
+      if (!customer) {
+        customer = await db.customer.create({
+          data: {
+            fullName: custName,
+            phone: custPhone,
+            email: emailKH || `${custPhone}@example.com`,
+            cccdCiphertext: cccdKH ? `ENC_${cccdKH}` : `ENC_CCCD_${Date.now()}`,
+            cccdHash: cccdKH ? `HASH_${cccdKH}` : `HASH_${Date.now()}`,
+            addressCiphertext: diachiKH || 'Hà Nội',
+            verificationStatus: 'VERIFIED'
+          }
+        });
+      }
+      resolvedCustomerId = customer.id;
     }
 
     // Resolve payment plan if not provided
@@ -96,38 +133,38 @@ export async function POST(request: Request) {
       const updated = await db.contract.update({
         where: { id: existingContract.id },
         data: {
-          customerId,
+          customerId: resolvedCustomerId,
           lockId: lockId || existingContract.lockId,
           salesEmployeeId: salesEmployeeId || existingContract.salesEmployeeId,
           paymentPlanId: resolvedPlanId,
-          agreedPrice: resolvedPrice,
-          dealRevenue: resolvedPrice,
+          agreedPrice: Number(giahopdong || resolvedPrice),
+          dealRevenue: Number(doanhso || resolvedPrice),
           signingStatus,
           signedDate: signedDate ? new Date(signedDate) : existingContract.signedDate,
           signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : existingContract.signedAt,
-          status: signingStatus === 'DA_KY' ? 'SIGNED' : existingContract.status,
-          commissionStatus,
+          status: requestedStatus || (signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW'),
+          commissionStatus: trangthaiThanhtoan || commissionStatus,
           commissionDueDate: commissionDueDate || existingContract.commissionDueDate,
-          commissionAmount: resolvedCommission,
-          investorContractNo: investorContractNo || existingContract.investorContractNo,
-          investorNotes: investorNotes || existingContract.investorNotes,
+          commissionAmount: Number(hoahong || resolvedCommission),
+          investorContractNo: maHopdong || investorContractNo || existingContract.investorContractNo,
+          investorNotes: ghichu || investorNotes || existingContract.investorNotes,
 
           // Class diagram fields (Hopdong)
-          maHopdong: String(existingContract.maHopdong || (202600 + contractCount + 1)),
-          maKH: String(existingContract.maKH || 1001),
-          sodienthoaiKH: customer.phone,
-          cccdKH: customer.cccdHash || '001200009999',
-          emailKH: customer.email || 'khachhang@gmail.com',
-          diachiKH: customer.addressCiphertext || 'Hà Nội',
-          hotenKH: customer.fullName,
-          phuonganthanhtoan: 'Thanh toán chuẩn theo tiến độ',
-          giahopdong: resolvedPrice,
+          maHopdong: String(maHopdong || existingContract.maHopdong || (202600 + contractCount + 1)),
+          maKH: String(maKH || existingContract.maKH || 1001),
+          sodienthoaiKH: sodienthoaiKH || customer.phone,
+          cccdKH: cccdKH || customer.cccdHash || '001200009999',
+          emailKH: emailKH || customer.email || 'khachhang@gmail.com',
+          diachiKH: diachiKH || customer.addressCiphertext || 'Hà Nội',
+          hotenKH: hotenKH || customer.fullName,
+          phuonganthanhtoan: phuonganthanhtoan || 'Thanh toán chuẩn theo tiến độ',
+          giahopdong: Number(giahopdong || resolvedPrice),
           thoigiankiHDMB: signedDate ? new Date(signedDate) : existingContract.signedDate,
           trangthaiHDMB: signingStatus,
-          doanhso: resolvedPrice,
-          hoahong: resolvedCommission,
-          trangthaiThanhtoan: commissionStatus,
-          ghichu: investorNotes || existingContract.investorNotes || 'Hợp đồng mua bán CĐT'
+          doanhso: Number(doanhso || resolvedPrice),
+          hoahong: Number(hoahong || resolvedCommission),
+          trangthaiThanhtoan: trangthaiThanhtoan || commissionStatus,
+          ghichu: ghichu || investorNotes || existingContract.investorNotes || 'Hợp đồng mua bán CĐT'
         },
         include: {
           product: { include: { project: true } },
@@ -146,7 +183,7 @@ export async function POST(request: Request) {
     // Generate formal contract number
     const year = new Date().getFullYear();
     const rand = Math.floor(Math.random() * 8999 + 1000);
-    const contractNumber = investorContractNo || `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
+    const contractNumber = maHopdong || investorContractNo || `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
     const contractCount = await db.contract.count();
 
     const snapshot = {
@@ -154,11 +191,11 @@ export async function POST(request: Request) {
       building: product.building,
       floor: product.floor,
       area: product.area,
-      customerName: customer.fullName,
-      customerPhone: customer.phone,
-      agreedPrice: resolvedPrice,
-      dealRevenue: resolvedPrice,
-      commissionAmount: resolvedCommission,
+      customerName: hotenKH || customer.fullName,
+      customerPhone: sodienthoaiKH || customer.phone,
+      agreedPrice: Number(giahopdong || resolvedPrice),
+      dealRevenue: Number(doanhso || resolvedPrice),
+      commissionAmount: Number(hoahong || resolvedCommission),
       createdAt: new Date().toISOString()
     };
 
@@ -166,39 +203,39 @@ export async function POST(request: Request) {
       data: {
         contractNumber,
         productId,
-        customerId,
+        customerId: resolvedCustomerId,
         lockId,
         salesEmployeeId,
         paymentPlanId: resolvedPlanId,
-        agreedPrice: resolvedPrice,
-        dealRevenue: resolvedPrice,
+        agreedPrice: Number(giahopdong || resolvedPrice),
+        dealRevenue: Number(doanhso || resolvedPrice),
         signingStatus,
         signedDate: signedDate ? new Date(signedDate) : null,
         signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : null,
-        status: signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW',
-        commissionStatus,
+        status: requestedStatus || (signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW'),
+        commissionStatus: trangthaiThanhtoan || commissionStatus,
         commissionDueDate: commissionDueDate || '25/10/2026',
-        commissionAmount: resolvedCommission,
-        investorContractNo: investorContractNo || contractNumber,
-        investorNotes,
+        commissionAmount: Number(hoahong || resolvedCommission),
+        investorContractNo: maHopdong || investorContractNo || contractNumber,
+        investorNotes: ghichu || investorNotes,
         snapshotJson: JSON.stringify(snapshot),
 
         // Class diagram fields (Hopdong)
-        maHopdong: String(202600 + contractCount + 1),
-        maKH: String(1000 + contractCount + 1),
-        sodienthoaiKH: customer.phone,
-        cccdKH: customer.cccdHash || '001200009999',
-        emailKH: customer.email || 'khachhang@gmail.com',
-        diachiKH: customer.addressCiphertext || 'Hà Nội',
-        hotenKH: customer.fullName,
-        phuonganthanhtoan: 'Thanh toán chuẩn theo tiến độ',
-        giahopdong: resolvedPrice,
+        maHopdong: String(maHopdong || (202600 + contractCount + 1)),
+        maKH: String(maKH || (1000 + contractCount + 1)),
+        sodienthoaiKH: sodienthoaiKH || customer.phone,
+        cccdKH: cccdKH || customer.cccdHash || '001200009999',
+        emailKH: emailKH || customer.email || 'khachhang@gmail.com',
+        diachiKH: diachiKH || customer.addressCiphertext || 'Hà Nội',
+        hotenKH: hotenKH || customer.fullName,
+        phuonganthanhtoan: phuonganthanhtoan || 'Thanh toán chuẩn theo tiến độ',
+        giahopdong: Number(giahopdong || resolvedPrice),
         thoigiankiHDMB: signedDate ? new Date(signedDate) : null,
         trangthaiHDMB: signingStatus,
-        doanhso: resolvedPrice,
-        hoahong: resolvedCommission,
-        trangthaiThanhtoan: commissionStatus,
-        ghichu: investorNotes || 'Hợp đồng mua bán chính thức CĐT'
+        doanhso: Number(doanhso || resolvedPrice),
+        hoahong: Number(hoahong || resolvedCommission),
+        trangthaiThanhtoan: trangthaiThanhtoan || commissionStatus,
+        ghichu: ghichu || investorNotes || 'Hợp đồng mua bán chính thức CĐT'
       },
       include: {
         product: { include: { project: true } },

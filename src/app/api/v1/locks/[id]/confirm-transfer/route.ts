@@ -86,22 +86,22 @@ export async function POST(
         where: { productId: lock.productId }
       });
 
+      let savedContract;
       if (existingContract) {
-        await tx.contract.update({
+        savedContract = await tx.contract.update({
           where: { id: existingContract.id },
           data: {
-            status: 'SIGNED',
-            signingStatus: 'DA_KY',
-            signedDate: now,
-            signedAt: now,
+            status: 'DRAFT',
+            signingStatus: 'CHUA_KY',
             dealRevenue: existingContract.dealRevenue || price,
             agreedPrice: existingContract.agreedPrice || price,
             salesEmployeeId: lock.salesEmployeeId || existingContract.salesEmployeeId,
             commissionStatus: 'DU_KIEN_TRA',
             commissionAmount: existingContract.commissionAmount || commission,
-            trangthaiHDMB: 'DA_KY',
+            trangthaiHDMB: 'Chưa ký',
             doanhso: existingContract.dealRevenue || price,
-            hoahong: existingContract.commissionAmount || commission
+            hoahong: existingContract.commissionAmount || commission,
+            investorNotes: `Đã xác nhận tiền cọc. Chờ Nhân viên kinh doanh nhập thông tin khách hàng và hợp đồng.`
           }
         });
       } else {
@@ -109,9 +109,9 @@ export async function POST(
         if (!customer) {
           customer = await tx.customer.create({
             data: {
-              fullName: 'Nguyễn Văn Hùng (Khách mua căn ' + lock.product.productCode + ')',
+              fullName: 'Khách mua căn ' + lock.product.productCode,
               phone: '0912345678',
-              email: 'hung.nguyen@gmail.com',
+              email: 'khachhang@example.com',
               cccdCiphertext: 'ENC_001200008888',
               cccdHash: '001200008888',
               addressCiphertext: 'Hà Nội',
@@ -140,7 +140,7 @@ export async function POST(
         const rand = Math.floor(Math.random() * 8999 + 1000);
         const contractNumber = `HĐMB-AHS-${lock.product.productCode.replace(/[^a-zA-Z0-9]/g, '')}-${now.getFullYear()}-${rand}`;
 
-        await tx.contract.create({
+        savedContract = await tx.contract.create({
           data: {
             contractNumber,
             productId: lock.productId,
@@ -150,15 +150,13 @@ export async function POST(
             paymentPlanId: plan.id,
             agreedPrice: price,
             dealRevenue: price,
-            status: 'SIGNED',
-            signingStatus: 'DA_KY',
-            signedDate: now,
-            signedAt: now,
+            status: 'DRAFT',
+            signingStatus: 'CHUA_KY',
             commissionStatus: 'DU_KIEN_TRA',
             commissionDueDate: '25/10/2026',
             commissionAmount: commission,
             investorContractNo: contractNumber,
-            investorNotes: `Hợp đồng tự động hoàn tất khi Sales Admin xác nhận nhận tiền cọc cho căn ${lock.product.productCode}`,
+            investorNotes: `Đã xác nhận tiền cọc cho căn ${lock.product.productCode}. Chờ nhân viên kinh doanh nhập thông tin khách hàng theo biểu mẫu hợp đồng.`,
             maHopdong: String(202600 + contractCount + 1),
             maKH: String(1000 + contractCount + 1),
             sodienthoaiKH: customer.phone,
@@ -168,12 +166,11 @@ export async function POST(
             hotenKH: customer.fullName,
             phuonganthanhtoan: plan.name,
             giahopdong: price,
-            thoigiankiHDMB: now,
-            trangthaiHDMB: 'DA_KY',
+            trangthaiHDMB: 'Chưa ký',
             doanhso: price,
             hoahong: commission,
             trangthaiThanhtoan: 'DU_KIEN_TRA',
-            ghichu: `Giao dịch cọc thành công qua Sales Admin: ${actorName}`
+            ghichu: `Đã cọc 100M qua Sales Admin: ${actorName}. Chờ nhập thông tin hợp đồng.`
           }
         });
       }
