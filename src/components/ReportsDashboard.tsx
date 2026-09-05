@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import jsPDF from 'jspdf';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+
 import {
   BarChart,
   Bar,
@@ -27,7 +27,7 @@ import {
   Calendar,
   CheckCircle,
   FileSpreadsheet,
-  FileText,
+  Loader2,
   Building2,
   Users,
   Layers,
@@ -55,6 +55,10 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
   const [realtimeDate, setRealtimeDate] = useState<string>(() => {
     return new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   });
+
+  // Export loading state
+  const [isExporting, setIsExporting] = useState<boolean>(false);
+
 
   // Calculate formatted period for "Thời gian thống kê"
   const formattedPeriod = useMemo(() => {
@@ -187,232 +191,556 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
   ];
 
   // -------------------------------------------------------------
-  // EXCEL EXPORTER (.XLSX)
+  // EXCEL EXPORTER (.XLSX) WITH BEAUTIFUL CELL FORMATTING & COLORS
   // -------------------------------------------------------------
-  const handleExportExcel = () => {
-    const wb = XLSX.utils.book_new();
+  const handleExportExcel = async () => {
+    try {
+      setIsExporting(true);
+      const wb = new ExcelJS.Workbook();
+      wb.creator = 'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS';
+      wb.lastModifiedBy = company.creator || 'AHS Admin';
+      wb.created = new Date();
+      wb.modified = new Date();
 
-    // Sheet 1: BC_DoanhThu
-    const r1Rows = [
-      ['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS'],
-      ['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam', '', '', '', '', '', '', 'CHỈ TIÊU', 'GIÁ TRỊ'],
-      ['Điện thoại: 0964960955', '', '', '', '', '', '', 'Tổng doanh thu', report1.summary.totalRevenue],
-      ['Người tạo', company.creator, '', 'Ngày tạo', company.createdDate, '', '', 'Số hợp đồng', report1.summary.totalContracts],
-      ['Thời gian thống kê', company.period, '', '', '', '', '', 'Giá trị HĐ TB', report1.summary.avgContractValue],
-      [],
-      ['BÁO CÁO DOANH THU THEO THỜI GIAN'],
-      ['Tổng hợp doanh thu từ hợp đồng theo tháng'],
-      [],
-      ['Tháng', 'Số hợp đồng', 'Doanh thu', 'Giá trị HĐ bình quân', 'Tỷ trọng DT', 'Ghi chú']
-    ];
+      // Shared Styling Constants
+      const companyTitleFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 13, bold: true, color: { argb: 'FF1E3A8A' } };
+      const companySubtitleFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 9.5, italic: true, color: { argb: 'FF475569' } };
+      const bannerTitleFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
+      const bannerSubtitleFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 9.5, italic: true, color: { argb: 'FF334155' } };
+      const tableHeaderFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } };
+      const dataCellFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 10, color: { argb: 'FF1E293B' } };
+      const dataCellBoldFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+      const totalCellFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 10.5, bold: true, color: { argb: 'FF92400E' } };
+      const footerFont: Partial<ExcelJS.Font> = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF64748B' } };
 
-    (report1.data || []).forEach((m: any) => {
-      r1Rows.push([
-        m.month,
-        m.contractsCount,
-        m.revenue,
-        m.avgContractValue,
-        m.revenueShare,
-        m.notes
-      ]);
-    });
+      const fillNavyHeader: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E40AF' } };
+      const fillTealHeader: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F766E' } };
+      const fillBannerNavy: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      const fillBannerTeal: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF115E59' } };
+      const fillBannerSub: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+      const fillTotalAmber: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF3C7' } };
+      const fillZebraWhite: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+      const fillZebraTint: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
 
-    r1Rows.push([
-      'TỔNG',
-      report1.summary.totalContracts,
-      report1.summary.totalRevenue,
-      report1.summary.avgContractValue,
-      1,
-      ''
-    ]);
-    r1Rows.push([]);
-    r1Rows.push(['Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
+      const thinBorder: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
 
-    const ws1 = XLSX.utils.aoa_to_sheet(r1Rows);
-    XLSX.utils.book_append_sheet(wb, ws1, 'BC_DoanhThu');
+      const headerBorder: Partial<ExcelJS.Borders> = {
+        top: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+        bottom: { style: 'medium', color: { argb: 'FF1E3A8A' } },
+        left: { style: 'thin', color: { argb: 'FF93C5FD' } },
+        right: { style: 'thin', color: { argb: 'FF93C5FD' } }
+      };
 
-    // Sheet 2: BC_SanPham_DuAn
-    const r2Rows = [
-      ['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS'],
-      ['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam'],
-      ['Điện thoại: 0964960955'],
-      ['Người tạo', company.creator, '', 'Ngày tạo', company.createdDate],
-      ['Thời gian thống kê', 'Tính đến ngày ' + company.createdDate],
-      [],
-      ['BÁO CÁO LƯỢNG SẢN PHẨM BÁN THEO DỰ ÁN'],
-      ['Theo dõi quỹ hàng và tỷ lệ bán của từng dự án'],
-      [],
-      ['Mã dự án', 'Tên dự án', 'Tổng sản phẩm', 'Còn hàng', 'Đang lock', 'Đã bán', 'Tỷ lệ bán']
-    ];
+      const totalBorder: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin', color: { argb: 'FFB45309' } },
+        bottom: { style: 'double', color: { argb: 'FFB45309' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } }
+      };
 
-    (report2.data || []).forEach((p: any) => {
-      r2Rows.push([
-        p.maDA,
-        p.tenDA,
-        p.totalUnits,
-        p.availableUnits,
-        p.lockedUnits,
-        p.soldUnits,
-        p.soldRate
-      ]);
-    });
-
-    r2Rows.push([
-      'TỔNG',
-      '',
-      report2.summary.totalUnits,
-      report2.summary.availableUnits,
-      report2.summary.lockedUnits,
-      report2.summary.soldUnits,
-      report2.summary.totalUnits > 0 ? (report2.summary.soldUnits / report2.summary.totalUnits) : 0
-    ]);
-    r2Rows.push([]);
-    r2Rows.push(['Ghi chú: Dự án chưa có quỹ sản phẩm sẽ hiển thị tổng sản phẩm = 0. Sản phẩm có trạng thái “Đã khớp” được tính vào nhóm đã bán trong báo cáo mẫu.']);
-    r2Rows.push(['Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
-
-    const ws2 = XLSX.utils.aoa_to_sheet(r2Rows);
-    XLSX.utils.book_append_sheet(wb, ws2, 'BC_SanPham_DuAn');
-
-    // Sheet 3: BC_DoanhSo_NV
-    const r3Rows = [
-      ['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS'],
-      ['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam'],
-      ['Điện thoại: 0964960955'],
-      ['Người tạo', company.creator, '', 'Ngày tạo', company.createdDate],
-      ['Thời gian thống kê', company.period],
-      [],
-      ['BÁO CÁO DOANH SỐ THEO NHÂN VIÊN'],
-      ['Đánh giá kết quả kinh doanh theo nhân viên phụ trách'],
-      [],
-      ['Mã NV', 'Họ tên nhân viên', 'Chức vụ', 'Số hợp đồng', 'Tổng doanh số', 'Tổng hoa hồng', 'Doanh số/HĐ']
-    ];
-
-    (report3.data || []).forEach((e: any) => {
-      r3Rows.push([
-        e.maNV,
-        e.fullName,
-        e.jobTitle,
-        e.contractsCount,
-        e.totalRevenue,
-        e.totalCommission,
-        e.avgRevenuePerContract
-      ]);
-    });
-
-    r3Rows.push([
-      'TỔNG',
-      '',
-      '',
-      report3.summary.totalContracts,
-      report3.summary.totalRevenue,
-      report3.summary.totalCommission,
-      report3.summary.avgRevenuePerContract
-    ]);
-    r3Rows.push([]);
-    r3Rows.push(['Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
-
-    const ws3 = XLSX.utils.aoa_to_sheet(r3Rows);
-    XLSX.utils.book_append_sheet(wb, ws3, 'BC_DoanhSo_NV');
-
-    XLSX.writeFile(wb, `Mau_3_Bao_Cao_AHS_${Date.now()}.xlsx`);
-  };
-
-  // -------------------------------------------------------------
-  // PDF EXPORTER (.PDF)
-  // -------------------------------------------------------------
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-
-    doc.setFontSize(16);
-    doc.setTextColor(14, 165, 233);
-    doc.text('CONG TY CO PHAN BAT DONG SAN AHS', 15, 20);
-
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text('Dia chi: Tang 4, The Legend Tower, 109 Nguyen Tuan, Thanh Xuan, Ha Noi | Hotline: 0964960955', 15, 26);
-    doc.text(`Nguoi lap: ${company.creator} | Ngay lap: ${company.createdDate} | Ky: ${company.period}`, 15, 32);
-    doc.line(15, 36, 195, 36);
-
-    if (activeTab === 'bc_doanhthu') {
-      doc.setFontSize(13);
-      doc.setTextColor(15, 23, 42);
-      doc.text('BAO CAO 1: DOANH THU THEO THOI GIAN (THANG 01/2026 - 12/2026)', 15, 46);
-
-      doc.setFontSize(9);
-      doc.text(`Tong doanh thu: ${formatVND(report1.summary.totalRevenue)} | Tong hop dong: ${report1.summary.totalContracts} HD`, 15, 54);
-      doc.text(`Gia tri HD binh quan: ${formatVND(report1.summary.avgContractValue)}`, 15, 60);
-
-      let y = 72;
-      doc.setFontSize(8);
-      doc.setTextColor(51, 65, 85);
-      doc.text('Thang          So HD      Doanh Thu (VND)                   Gia Tri Binh Quan (VND)      Ty Trong', 15, y);
-      y += 6;
-      doc.line(15, y, 195, y);
-      y += 6;
-
-      (report1.data || []).forEach((m: any) => {
-        doc.text(`${m.month}        ${String(m.contractsCount).padStart(3, ' ')}        ${Number(m.revenue).toLocaleString('vi-VN').padEnd(25, ' ')}  ${Number(m.avgContractValue).toLocaleString('vi-VN').padEnd(25, ' ')}  ${(m.revenueShare * 100).toFixed(1)}%`, 15, y);
-        y += 6;
+      // ==========================================
+      // SHEET 1: BC_DoanhThu
+      // ==========================================
+      const ws1 = wb.addWorksheet('BC_DoanhThu', {
+        views: [{ showGridLines: true }]
       });
 
-      doc.line(15, y, 195, y);
-      y += 6;
-      doc.setFontSize(9);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`TONG CONG:    ${report1.summary.totalContracts} HD       ${Number(report1.summary.totalRevenue).toLocaleString('vi-VN')} VND                                             100%`, 15, y);
-    } else if (activeTab === 'bc_sanpham_duan') {
-      doc.setFontSize(13);
-      doc.setTextColor(15, 23, 42);
-      doc.text('BAO CAO 2: LUONG SAN PHAM BAN THEO DU AN', 15, 46);
+      ws1.columns = [
+        { key: 'c1', width: 16 },
+        { key: 'c2', width: 18 },
+        { key: 'c3', width: 26 },
+        { key: 'c4', width: 26 },
+        { key: 'c5', width: 16 },
+        { key: 'c6', width: 36 }
+      ];
 
-      let y = 58;
-      doc.setFontSize(8);
-      doc.text('Ma DA    Ten Du An                                 Tong Can    Con Hang    Dang Lock    Da Ban    Ty Le Ban', 15, y);
-      y += 6;
-      doc.line(15, y, 195, y);
-      y += 6;
+      // Company info
+      const r1_1 = ws1.addRow(['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS']);
+      r1_1.font = companyTitleFont;
+      r1_1.height = 22;
 
-      (report2.data || []).forEach((p: any) => {
-        const namePart = p.tenDA.padEnd(38, ' ').substring(0, 38);
-        doc.text(`${p.maDA}     ${namePart}  ${String(p.totalUnits).padStart(5, ' ')}       ${String(p.availableUnits).padStart(5, ' ')}       ${String(p.lockedUnits).padStart(5, ' ')}       ${String(p.soldUnits).padStart(5, ' ')}     ${p.formattedSoldRate}`, 15, y);
-        y += 7;
+      const r1_2 = ws1.addRow(['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Hà Nội']);
+      r1_2.font = companySubtitleFont;
+      r1_2.height = 18;
+
+      const r1_3 = ws1.addRow(['Hotline: 0964 960 955  |  Website: https://ahsproperty.vn  |  Phạm vi: Toàn quốc']);
+      r1_3.font = companySubtitleFont;
+      r1_3.height = 18;
+
+      ws1.addRow([]); // Blank line
+
+      // Report Banner
+      const bRow1_5 = ws1.addRow(['BÁO CÁO DOANH THU THEO THỜI GIAN']);
+      bRow1_5.height = 30;
+      ws1.mergeCells('A5:F5');
+      const bannerCell1 = ws1.getCell('A5');
+      bannerCell1.fill = fillBannerNavy;
+      bannerCell1.font = bannerTitleFont;
+      bannerCell1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const bRow1_6 = ws1.addRow([`Kỳ thống kê: ${company.period}   |   Người lập: ${company.creator}   |   Ngày lập: ${company.createdDate}`]);
+      bRow1_6.height = 22;
+      ws1.mergeCells('A6:F6');
+      const subBannerCell1 = ws1.getCell('A6');
+      subBannerCell1.fill = fillBannerSub;
+      subBannerCell1.font = bannerSubtitleFont;
+      subBannerCell1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws1.addRow([]); // Blank line
+
+      // Table Header
+      const hRow1 = ws1.addRow([
+        'Tháng',
+        'Số hợp đồng',
+        'Doanh thu (VNĐ)',
+        'Giá trị HĐ TB (VNĐ)',
+        'Tỷ trọng DT',
+        'Ghi chú'
+      ]);
+      hRow1.height = 28;
+      hRow1.eachCell((cell) => {
+        cell.fill = fillNavyHeader;
+        cell.font = tableHeaderFont;
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = headerBorder;
       });
 
-      doc.line(15, y, 195, y);
-      y += 7;
-      doc.setFontSize(9);
-      doc.text(`TONG CONG:                                         ${report2.summary.totalUnits} can      ${report2.summary.availableUnits} can        0 can      ${report2.summary.soldUnits} can    ${report2.summary.totalSoldRate}`, 15, y);
-    } else {
-      doc.setFontSize(13);
-      doc.setTextColor(15, 23, 42);
-      doc.text('BAO CAO 3: DOANH SO THEO TUNG NHAN VIEN', 15, 46);
+      // Data Rows
+      (report1.data || []).forEach((m: any, idx: number) => {
+        const row = ws1.addRow([
+          m.month,
+          Number(m.contractsCount) || 0,
+          Number(m.revenue) || 0,
+          Number(m.avgContractValue) || 0,
+          Number(m.revenueShare) || 0,
+          m.notes || ''
+        ]);
+        row.height = 23;
+        const isOdd = idx % 2 === 1;
+        const currentFill = isOdd ? fillZebraTint : fillZebraWhite;
 
-      let y = 58;
-      doc.setFontSize(8);
-      doc.text('Ma NV    Ho Ten                      Chuc Vu                    So HD    Tong Doanh So (VND)      Hoa Hong (VND)', 15, y);
-      y += 6;
-      doc.line(15, y, 195, y);
-      y += 6;
+        // Cell 1: Month
+        const c1 = row.getCell(1);
+        c1.alignment = { horizontal: 'center', vertical: 'middle' };
+        c1.font = dataCellBoldFont;
 
-      (report3.data || []).forEach((e: any) => {
-        const name = e.fullName.padEnd(24, ' ').substring(0, 24);
-        const job = e.jobTitle.padEnd(24, ' ').substring(0, 24);
-        doc.text(`${e.maNV}    ${name}    ${job}   ${String(e.contractsCount).padStart(3, ' ')}     ${Number(e.totalRevenue).toLocaleString('vi-VN').padEnd(20, ' ')}   ${Number(e.totalCommission).toLocaleString('vi-VN')}`, 15, y);
-        y += 7;
+        // Cell 2: Contract Count
+        const c2 = row.getCell(2);
+        c2.alignment = { horizontal: 'right', vertical: 'middle' };
+        c2.numFmt = '#,##0';
+        c2.font = dataCellFont;
+
+        // Cell 3: Revenue
+        const c3 = row.getCell(3);
+        c3.alignment = { horizontal: 'right', vertical: 'middle' };
+        c3.numFmt = '#,##0 "₫"';
+        c3.font = dataCellBoldFont;
+
+        // Cell 4: Avg Contract Value
+        const c4 = row.getCell(4);
+        c4.alignment = { horizontal: 'right', vertical: 'middle' };
+        c4.numFmt = '#,##0 "₫"';
+        c4.font = dataCellFont;
+
+        // Cell 5: Revenue Share
+        const c5 = row.getCell(5);
+        c5.alignment = { horizontal: 'right', vertical: 'middle' };
+        c5.numFmt = '0.0%';
+        c5.font = dataCellFont;
+
+        // Cell 6: Notes
+        const c6 = row.getCell(6);
+        c6.alignment = { horizontal: 'left', vertical: 'middle' };
+        c6.font = dataCellFont;
+
+        row.eachCell((cell) => {
+          cell.fill = currentFill;
+          cell.border = thinBorder;
+        });
       });
 
-      doc.line(15, y, 195, y);
-      y += 7;
-      doc.setFontSize(9);
-      doc.text(`TONG CONG:                                                           ${report3.summary.totalContracts} HD    ${Number(report3.summary.totalRevenue).toLocaleString('vi-VN')} đ   ${Number(report3.summary.totalCommission).toLocaleString('vi-VN')} đ`, 15, y);
+      // Total Row
+      const totRow1 = ws1.addRow([
+        'TỔNG CỘNG',
+        Number(report1.summary.totalContracts) || 0,
+        Number(report1.summary.totalRevenue) || 0,
+        Number(report1.summary.avgContractValue) || 0,
+        1,
+        ''
+      ]);
+      totRow1.height = 26;
+      totRow1.eachCell((cell, colNumber) => {
+        cell.fill = fillTotalAmber;
+        cell.font = totalCellFont;
+        cell.border = totalBorder;
+        if (colNumber === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colNumber === 2) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+        } else if (colNumber === 3 || colNumber === 4) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0 "₫"';
+        } else if (colNumber === 5) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '0.0%';
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        }
+      });
+
+      // Footer
+      ws1.addRow([]);
+      const f1_1 = ws1.addRow(['* Báo cáo được tạo tự động từ Hệ thống Quản trị & Phân phối Bất động sản AHS.']);
+      f1_1.font = footerFont;
+      const f1_2 = ws1.addRow(['* Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
+      f1_2.font = footerFont;
+
+      // ==========================================
+      // SHEET 2: BC_SanPham_DuAn
+      // ==========================================
+      const ws2 = wb.addWorksheet('BC_SanPham_DuAn', {
+        views: [{ showGridLines: true }]
+      });
+
+      ws2.columns = [
+        { key: 'c1', width: 16 },
+        { key: 'c2', width: 34 },
+        { key: 'c3', width: 18 },
+        { key: 'c4', width: 16 },
+        { key: 'c5', width: 16 },
+        { key: 'c6', width: 16 },
+        { key: 'c7', width: 16 }
+      ];
+
+      // Company info
+      const r2_1 = ws2.addRow(['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS']);
+      r2_1.font = companyTitleFont;
+      r2_1.height = 22;
+
+      const r2_2 = ws2.addRow(['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Hà Nội']);
+      r2_2.font = companySubtitleFont;
+      r2_2.height = 18;
+
+      const r2_3 = ws2.addRow(['Hotline: 0964 960 955  |  Website: https://ahsproperty.vn  |  Phạm vi: Toàn quốc']);
+      r2_3.font = companySubtitleFont;
+      r2_3.height = 18;
+
+      ws2.addRow([]); // Blank line
+
+      // Report Banner
+      const bRow2_5 = ws2.addRow(['BÁO CÁO LƯỢNG SẢN PHẨM BÁN THEO DỰ ÁN']);
+      bRow2_5.height = 30;
+      ws2.mergeCells('A5:G5');
+      const bannerCell2 = ws2.getCell('A5');
+      bannerCell2.fill = fillBannerTeal;
+      bannerCell2.font = bannerTitleFont;
+      bannerCell2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const bRow2_6 = ws2.addRow([`Thời gian thống kê: Tính đến ngày ${company.createdDate}   |   Người lập: ${company.creator}`]);
+      bRow2_6.height = 22;
+      ws2.mergeCells('A6:G6');
+      const subBannerCell2 = ws2.getCell('A6');
+      subBannerCell2.fill = fillBannerSub;
+      subBannerCell2.font = bannerSubtitleFont;
+      subBannerCell2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws2.addRow([]); // Blank line
+
+      // Table Header
+      const hRow2 = ws2.addRow([
+        'Mã dự án',
+        'Tên dự án',
+        'Tổng sản phẩm',
+        'Còn hàng',
+        'Đang lock',
+        'Đã bán',
+        'Tỷ lệ bán'
+      ]);
+      hRow2.height = 28;
+      hRow2.eachCell((cell) => {
+        cell.fill = fillTealHeader;
+        cell.font = tableHeaderFont;
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = headerBorder;
+      });
+
+      // Data Rows
+      (report2.data || []).forEach((p: any, idx: number) => {
+        const row = ws2.addRow([
+          p.maDA,
+          p.tenDA,
+          Number(p.totalUnits) || 0,
+          Number(p.availableUnits) || 0,
+          Number(p.lockedUnits) || 0,
+          Number(p.soldUnits) || 0,
+          Number(p.soldRate) || 0
+        ]);
+        row.height = 23;
+        const isOdd = idx % 2 === 1;
+        const currentFill = isOdd ? fillZebraTint : fillZebraWhite;
+
+        // Cell 1: Project Code
+        const c1 = row.getCell(1);
+        c1.alignment = { horizontal: 'center', vertical: 'middle' };
+        c1.font = dataCellBoldFont;
+
+        // Cell 2: Project Name
+        const c2 = row.getCell(2);
+        c2.alignment = { horizontal: 'left', vertical: 'middle' };
+        c2.font = dataCellFont;
+
+        // Cells 3-6: Numbers
+        for (let i = 3; i <= 6; i++) {
+          const c = row.getCell(i);
+          c.alignment = { horizontal: 'right', vertical: 'middle' };
+          c.numFmt = '#,##0';
+          c.font = i === 6 ? dataCellBoldFont : dataCellFont;
+        }
+
+        // Cell 7: Rate
+        const c7 = row.getCell(7);
+        c7.alignment = { horizontal: 'right', vertical: 'middle' };
+        c7.numFmt = '0.0%';
+        c7.font = dataCellBoldFont;
+
+        row.eachCell((cell) => {
+          cell.fill = currentFill;
+          cell.border = thinBorder;
+        });
+      });
+
+      // Total Row
+      const totSoldRate = report2.summary.totalUnits > 0
+        ? (report2.summary.soldUnits / report2.summary.totalUnits)
+        : 0;
+
+      const totRow2 = ws2.addRow([
+        'TỔNG CỘNG',
+        '',
+        Number(report2.summary.totalUnits) || 0,
+        Number(report2.summary.availableUnits) || 0,
+        Number(report2.summary.lockedUnits) || 0,
+        Number(report2.summary.soldUnits) || 0,
+        totSoldRate
+      ]);
+      totRow2.height = 26;
+      totRow2.eachCell((cell, colNumber) => {
+        cell.fill = fillTotalAmber;
+        cell.font = totalCellFont;
+        cell.border = totalBorder;
+        if (colNumber === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colNumber === 2) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        } else if (colNumber >= 3 && colNumber <= 6) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+        } else if (colNumber === 7) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '0.0%';
+        }
+      });
+
+      // Footer
+      ws2.addRow([]);
+      const f2_1 = ws2.addRow(['* Ghi chú: Dự án chưa có quỹ sản phẩm sẽ hiển thị tổng sản phẩm = 0. Sản phẩm có trạng thái “Đã khớp” hoặc “Đã bán” được tính vào nhóm đã bán.']);
+      f2_1.font = footerFont;
+      const f2_2 = ws2.addRow(['* Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
+      f2_2.font = footerFont;
+
+      // ==========================================
+      // SHEET 3: BC_DoanhSo_NV
+      // ==========================================
+      const ws3 = wb.addWorksheet('BC_DoanhSo_NV', {
+        views: [{ showGridLines: true }]
+      });
+
+      ws3.columns = [
+        { key: 'c1', width: 14 },
+        { key: 'c2', width: 28 },
+        { key: 'c3', width: 24 },
+        { key: 'c4', width: 16 },
+        { key: 'c5', width: 26 },
+        { key: 'c6', width: 24 },
+        { key: 'c7', width: 24 }
+      ];
+
+      // Company info
+      const r3_1 = ws3.addRow(['CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS']);
+      r3_1.font = companyTitleFont;
+      r3_1.height = 22;
+
+      const r3_2 = ws3.addRow(['Địa chỉ: Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Hà Nội']);
+      r3_2.font = companySubtitleFont;
+      r3_2.height = 18;
+
+      const r3_3 = ws3.addRow(['Hotline: 0964 960 955  |  Website: https://ahsproperty.vn  |  Phạm vi: Toàn quốc']);
+      r3_3.font = companySubtitleFont;
+      r3_3.height = 18;
+
+      ws3.addRow([]); // Blank line
+
+      // Report Banner
+      const bRow3_5 = ws3.addRow(['BÁO CÁO DOANH SỐ THEO NHÂN VIÊN']);
+      bRow3_5.height = 30;
+      ws3.mergeCells('A5:G5');
+      const bannerCell3 = ws3.getCell('A5');
+      bannerCell3.fill = fillBannerNavy;
+      bannerCell3.font = bannerTitleFont;
+      bannerCell3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      const bRow3_6 = ws3.addRow([`Kỳ thống kê: ${company.period}   |   Người lập: ${company.creator}   |   Ngày lập: ${company.createdDate}`]);
+      bRow3_6.height = 22;
+      ws3.mergeCells('A6:G6');
+      const subBannerCell3 = ws3.getCell('A6');
+      subBannerCell3.fill = fillBannerSub;
+      subBannerCell3.font = bannerSubtitleFont;
+      subBannerCell3.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      ws3.addRow([]); // Blank line
+
+      // Table Header
+      const hRow3 = ws3.addRow([
+        'Mã NV',
+        'Họ tên nhân viên',
+        'Chức vụ',
+        'Số hợp đồng',
+        'Tổng doanh số (VNĐ)',
+        'Tổng hoa hồng (VNĐ)',
+        'Doanh số / HĐ (VNĐ)'
+      ]);
+      hRow3.height = 28;
+      hRow3.eachCell((cell) => {
+        cell.fill = fillNavyHeader;
+        cell.font = tableHeaderFont;
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        cell.border = headerBorder;
+      });
+
+      // Data Rows
+      (report3.data || []).forEach((e: any, idx: number) => {
+        const row = ws3.addRow([
+          e.maNV,
+          e.fullName,
+          e.jobTitle,
+          Number(e.contractsCount) || 0,
+          Number(e.totalRevenue) || 0,
+          Number(e.totalCommission) || 0,
+          Number(e.avgRevenuePerContract) || 0
+        ]);
+        row.height = 23;
+        const isOdd = idx % 2 === 1;
+        const currentFill = isOdd ? fillZebraTint : fillZebraWhite;
+
+        // Cell 1: Employee Code
+        const c1 = row.getCell(1);
+        c1.alignment = { horizontal: 'center', vertical: 'middle' };
+        c1.font = dataCellBoldFont;
+
+        // Cell 2: Name
+        const c2 = row.getCell(2);
+        c2.alignment = { horizontal: 'left', vertical: 'middle' };
+        c2.font = dataCellBoldFont;
+
+        // Cell 3: Job Title
+        const c3 = row.getCell(3);
+        c3.alignment = { horizontal: 'left', vertical: 'middle' };
+        c3.font = dataCellFont;
+
+        // Cell 4: Contracts Count
+        const c4 = row.getCell(4);
+        c4.alignment = { horizontal: 'right', vertical: 'middle' };
+        c4.numFmt = '#,##0';
+        c4.font = dataCellFont;
+
+        // Cell 5: Total Revenue
+        const c5 = row.getCell(5);
+        c5.alignment = { horizontal: 'right', vertical: 'middle' };
+        c5.numFmt = '#,##0 "₫"';
+        c5.font = dataCellBoldFont;
+
+        // Cell 6: Total Commission (Emerald green accent)
+        const c6 = row.getCell(6);
+        c6.alignment = { horizontal: 'right', vertical: 'middle' };
+        c6.numFmt = '#,##0 "₫"';
+        c6.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF047857' } };
+
+        // Cell 7: Avg Revenue Per Contract
+        const c7 = row.getCell(7);
+        c7.alignment = { horizontal: 'right', vertical: 'middle' };
+        c7.numFmt = '#,##0 "₫"';
+        c7.font = dataCellFont;
+
+        row.eachCell((cell) => {
+          cell.fill = currentFill;
+          cell.border = thinBorder;
+        });
+      });
+
+      // Total Row
+      const totRow3 = ws3.addRow([
+        'TỔNG CỘNG',
+        '',
+        '',
+        Number(report3.summary.totalContracts) || 0,
+        Number(report3.summary.totalRevenue) || 0,
+        Number(report3.summary.totalCommission) || 0,
+        Number(report3.summary.avgRevenuePerContract) || 0
+      ]);
+      totRow3.height = 26;
+      totRow3.eachCell((cell, colNumber) => {
+        cell.fill = fillTotalAmber;
+        cell.font = totalCellFont;
+        cell.border = totalBorder;
+        if (colNumber === 1) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        } else if (colNumber === 2 || colNumber === 3) {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        } else if (colNumber === 4) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0';
+        } else {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0 "₫"';
+        }
+      });
+
+      // Footer
+      ws3.addRow([]);
+      const f3_1 = ws3.addRow(['* Báo cáo đánh giá năng suất kinh doanh & tỷ lệ chuyển đổi nhân viên phòng kinh doanh AHS.']);
+      f3_1.font = footerFont;
+      const f3_2 = ws3.addRow(['* Nguồn thông tin liên hệ doanh nghiệp: https://ahsproperty.vn/lien-he/']);
+      f3_2.font = footerFont;
+
+      // ==========================================
+      // WRITE AND DOWNLOAD FILE
+      // ==========================================
+      const buffer = await wb.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Mau_3_Bao_Cao_AHS_${Date.now()}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Lỗi khi xuất file Excel:', error);
+      alert('Có lỗi xảy ra khi tạo file Excel. Vui lòng thử lại.');
+    } finally {
+      setIsExporting(false);
     }
-
-    doc.setFontSize(10);
-    doc.text('DAI DIEN BAN LANH DAO AHS', 130, 240);
-    doc.text('(Ky va dong dau xac nhan)', 132, 247);
-
-    doc.save(`AHS_${activeTab.toUpperCase()}_${Date.now()}.pdf`);
   };
+
 
   return (
     <div className="space-y-6">
@@ -468,18 +796,20 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
             <button
               onClick={handleExportExcel}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 text-white text-xs font-bold shadow-xl shadow-emerald-600/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2 transition border border-emerald-400/30"
+              disabled={isExporting}
+              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 text-white text-xs font-bold shadow-xl shadow-emerald-600/25 hover:shadow-emerald-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2 transition border border-emerald-400/30 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>Xuất Excel (.xlsx)</span>
-            </button>
-
-            <button
-              onClick={handleExportPDF}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 text-white text-xs font-bold shadow-xl shadow-blue-600/25 hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2 transition border border-blue-400/30"
-            >
-              <FileText className="w-4 h-4" />
-              <span>Xuất PDF Chuẩn</span>
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang xuất Excel...</span>
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Xuất Excel (.xlsx)</span>
+                </>
+              )}
             </button>
           </div>
         </div>
