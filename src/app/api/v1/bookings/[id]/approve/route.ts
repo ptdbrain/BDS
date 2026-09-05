@@ -25,14 +25,30 @@ export async function PATCH(
     }
 
     const now = new Date();
-    // Khung giờ khớp căn: 10 phút đếm ngược
-    const startMatch = now;
-    const endMatch = new Date(now.getTime() + 10 * 60 * 1000);
+    // Quy tắc khớp căn tuần tự 10 phút:
+    // Kiểm tra xem trong dự án có lượt booking nào đang trong thời gian khớp căn (hoặc kết thúc sau thời điểm hiện tại) hay không
+    const activeOrQueuedBooking = await db.booking.findFirst({
+      where: {
+        projectId: booking.projectId,
+        id: { not: bookingId },
+        tgKetthuckhopcan: { gt: now }
+      },
+      orderBy: { tgKetthuckhopcan: 'desc' }
+    });
+
+    let startMatch = now;
+    if (activeOrQueuedBooking && activeOrQueuedBooking.tgKetthuckhopcan) {
+      // Bắt đầu ngay sau khi lượt trước kết thúc
+      startMatch = new Date(activeOrQueuedBooking.tgKetthuckhopcan);
+    }
+    const endMatch = new Date(startMatch.getTime() + 10 * 60 * 1000);
+
+    const isImmediate = startMatch.getTime() <= now.getTime();
 
     const updatedBooking = await db.booking.update({
       where: { id: bookingId },
       data: {
-        trangthaikhopcan: 'DANG_KHOP', // Kích hoạt thời gian khớp căn 10 phút
+        trangthaikhopcan: isImmediate ? 'DANG_KHOP' : 'CHO_KHOP', // Nếu đến lượt thì ĐANG_KHOP, nếu chưa thì CHỜ_KHỚP
         tgBatdaukhop: startMatch,
         tgKetthuckhopcan: endMatch,
         notes: booking.notes ? `${booking.notes} | ${notes}` : notes

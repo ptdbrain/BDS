@@ -681,7 +681,7 @@ export function InventoryMatrix({
                       <th className="p-3.5">Mã Booking [MaLuotBooking]</th>
                       <th className="p-3.5">Khách Hàng</th>
                       <th className="p-3.5">Thời Gian Booking [TGBooking]</th>
-                      <th className="p-3.5">TG Khớp Căn [TGbatdau - TGketthuc]</th>
+                      <th className="p-3.5">TG Khớp Căn (10 Phút/lượt)</th>
                       <th className="p-3.5">Số Tiền Giữ Chỗ</th>
                       <th className="p-3.5">Trạng Thái [Trangthaikhopcan]</th>
                       <th className="p-3.5">Nhân Viên Phụ Trách</th>
@@ -694,6 +694,16 @@ export function InventoryMatrix({
                       const isMatching = b.trangthaikhopcan === 'DANG_KHOP';
                       const isMatched = b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp';
                       const isExpired = b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian';
+
+                      const formatHM = (dt?: string | Date | null) => {
+                        if (!dt) return '';
+                        const d = new Date(dt);
+                        if (isNaN(d.getTime())) return '';
+                        const h = String(d.getHours()).padStart(2, '0');
+                        const m = String(d.getMinutes()).padStart(2, '0');
+                        const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                        return `${h}h${m} (${dateStr})`;
+                      };
 
                       return (
                         <tr key={b.id} className="hover:bg-slate-800/40 transition">
@@ -712,11 +722,13 @@ export function InventoryMatrix({
                             {new Date(b.tgBooking).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
                           </td>
                           <td className="p-3.5">
-                            <div className="text-[11px] text-emerald-400 font-mono">
-                              Bắt đầu: {b.tgBatdaukhop ? `${new Date(b.tgBatdaukhop).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${new Date(b.tgBatdaukhop).toLocaleDateString('vi-VN')}` : 'Khi mở bán'}
+                            <div className="text-[12px] text-emerald-400 font-mono font-medium flex items-center gap-1.5">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">Bắt đầu</span>
+                              <span>{formatHM(b.tgBatdaukhop) || '09h10'}</span>
                             </div>
-                            <div className="text-[11px] text-rose-400 font-mono">
-                              Kết thúc: {b.tgKetthuckhopcan ? `${new Date(b.tgKetthuckhopcan).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${new Date(b.tgKetthuckhopcan).toLocaleDateString('vi-VN')}` : 'Sau 10 phút'}
+                            <div className="text-[12px] text-rose-400 font-mono font-medium flex items-center gap-1.5 mt-1">
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold">Kết thúc</span>
+                              <span>{formatHM(b.tgKetthuckhopcan) || '09h20'}</span>
                             </div>
                           </td>
                           <td className="p-3.5 font-bold text-brand-400">

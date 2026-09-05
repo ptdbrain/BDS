@@ -465,29 +465,69 @@ async function main() {
   // 7. Booking (48 lượt)
   console.log('📑 8/9 Nạp bảng Booking (48 lượt booking giữ chỗ)...');
   const bkRows = XLSX.utils.sheet_to_json(wb.Sheets['Booking']);
+  
+  // Group by project code
+  const bkByProject = new Map();
   for (const row of bkRows) {
-    const proj = projectMap.get(row.MaDA);
-    if (!proj) continue;
-    const emp = employeeMap.get(row.MaNV) || employeeMap.get('NV001');
-
-    await prisma.booking.create({
-      data: {
-        maLuotBooking: row.MaLuotBooking,
-        projectId: proj.id,
-        salesEmployeeId: emp.id,
-        sttBooking: Number(row.STTBooking),
-        tgBooking: parseExcelDate(row.TGBooking) || new Date(),
-        tgBatdaukhop: parseExcelDate(row.TGBatDauKhopCan),
-        tgKetthuckhopcan: parseExcelDate(row.TGKetThucKhopCan),
-        trangthaikhopcan: row.TrangThaiKhopCan, // 'Đã khớp', 'Chưa khớp', 'Hết thời gian'
-        customerName: `Khách hàng Ưu tiên #${row.STTBooking}`,
-        customerPhone: `098${String(row.STTBooking).padStart(7, '0')}`,
-        depositAmount: 50000000,
-        notes: `Lượt Booking đợt 1 dự án ${proj.name} - Mã ${row.MaLuotBooking}`
-      }
-    });
+    if (!bkByProject.has(row.MaDA)) {
+      bkByProject.set(row.MaDA, []);
+    }
+    bkByProject.get(row.MaDA).push(row);
   }
-  console.log(`✓ Đã nạp ${bkRows.length} lượt Booking.`);
+
+  // Chained 10-minute matching windows:
+  // STT 1: Bắt đầu 09h10, Kết thúc 09h20
+  // STT 2: Bắt đầu 09h20, Kết thúc 09h30
+  // STT 3: Bắt đầu 09h30, Kết thúc 09h40, ...
+  for (const [maDA, rows] of bkByProject.entries()) {
+    const proj = projectMap.get(maDA);
+    if (!proj) continue;
+
+    rows.sort((a, b) => Number(a.STTBooking) - Number(b.STTBooking));
+
+    // Base date for matching session: 09h10
+    const baseYear = 2026;
+    const baseMonth = 5; // Tháng 6 (0-indexed: 5)
+    let baseDay = 3;
+    if (maDA === 'DA004') baseDay = 5;
+    else if (maDA === 'DA005') baseDay = 10;
+    else if (maDA === 'DA006') baseDay = 15;
+
+    let turnStart = new Date(baseYear, baseMonth, baseDay, 9, 10, 0, 0);
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const emp = employeeMap.get(row.MaNV) || employeeMap.get('NV001');
+      const stt = Number(row.STTBooking) || (i + 1);
+
+      const startMatch = new Date(turnStart.getTime());
+      const endMatch = new Date(startMatch.getTime() + 10 * 60 * 1000);
+      turnStart = new Date(endMatch.getTime());
+
+      const startH = String(startMatch.getHours()).padStart(2, '0');
+      const startM = String(startMatch.getMinutes()).padStart(2, '0');
+      const endH = String(endMatch.getHours()).padStart(2, '0');
+      const endM = String(endMatch.getMinutes()).padStart(2, '0');
+
+      await prisma.booking.create({
+        data: {
+          maLuotBooking: row.MaLuotBooking,
+          projectId: proj.id,
+          salesEmployeeId: emp.id,
+          sttBooking: stt,
+          tgBooking: parseExcelDate(row.TGBooking) || new Date(baseYear, 4, 20 + (i % 5), 9, 0, 0),
+          tgBatdaukhop: startMatch,
+          tgKetthuckhopcan: endMatch,
+          trangthaikhopcan: row.TrangThaiKhopCan, // 'Đã khớp', 'Chưa khớp', 'Hết thời gian'
+          customerName: `Khách hàng Ưu tiên #${stt}`,
+          customerPhone: `098${String(stt).padStart(7, '0')}`,
+          depositAmount: 50000000,
+          notes: `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (Dự án ${proj.name})`
+        }
+      });
+    }
+  }
+  console.log(`✓ Đã nạp ${bkRows.length} lượt Booking theo chuỗi 10 phút nối tiếp (09h10-09h20, 09h20-09h30,...).`);
 
   // 8. LuotLock (40 lượt) & HopDong (24 hợp đồng)
   console.log('🔒 & 📜 9/9 Nạp bảng LuotLock (40) & HopDong (24) kèm Giao Dịch & Khách Hàng...');

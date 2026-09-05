@@ -742,6 +742,7 @@ export function LockManager({
                   <th className="p-3.5">Mã Booking</th>
                   <th className="p-3.5">Dự Án</th>
                   <th className="p-3.5">Khách Hàng</th>
+                  <th className="p-3.5">TG Khớp Căn (10 Phút/lượt)</th>
                   <th className="p-3.5">Tiền Cọc</th>
                   <th className="p-3.5">Trạng Thái Khớp Căn</th>
                   <th className="p-3.5">Sales Phụ Trách</th>
@@ -751,7 +752,7 @@ export function LockManager({
               <tbody className="divide-y divide-slate-800 text-slate-200">
                 {(bookings || []).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-slate-500">
+                    <td colSpan={9} className="p-8 text-center text-slate-500">
                       Chưa có dữ liệu Booking nào trong hệ thống
                     </td>
                   </tr>
@@ -761,6 +762,16 @@ export function LockManager({
                     const isMatching = b.trangthaikhopcan === 'DANG_KHOP';
                     const isMatched = b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp';
                     const isExpired = b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian';
+
+                    const formatHM = (dt?: string | Date | null) => {
+                      if (!dt) return '';
+                      const d = new Date(dt);
+                      if (isNaN(d.getTime())) return '';
+                      const h = String(d.getHours()).padStart(2, '0');
+                      const m = String(d.getMinutes()).padStart(2, '0');
+                      const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                      return `${h}h${m} (${dateStr})`;
+                    };
 
                     return (
                       <tr key={b.id} className="hover:bg-slate-800/40 transition">
@@ -776,6 +787,16 @@ export function LockManager({
                         <td className="p-3.5">
                           <div className="font-semibold text-white">{b.customerName || 'Khách hàng'}</div>
                           <div className="text-[11px] text-slate-400">{b.customerPhone}</div>
+                        </td>
+                        <td className="p-3.5">
+                          <div className="text-[12px] text-emerald-400 font-mono font-medium flex items-center gap-1.5">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">Bắt đầu</span>
+                            <span>{formatHM(b.tgBatdaukhop) || '09h10'}</span>
+                          </div>
+                          <div className="text-[12px] text-rose-400 font-mono font-medium flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold">Kết thúc</span>
+                            <span>{formatHM(b.tgKetthuckhopcan) || '09h20'}</span>
+                          </div>
                         </td>
                         <td className="p-3.5 font-bold text-amber-400">
                           {(b.depositAmount || 50000000).toLocaleString('vi-VN')} VND

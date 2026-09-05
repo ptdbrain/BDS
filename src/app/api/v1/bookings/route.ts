@@ -88,11 +88,13 @@ export async function POST(request: Request) {
       validSalesId = emp.id;
     }
 
-    // Find current max STT for this project
-    const bookingCount = await db.booking.count({
-      where: { projectId }
+    // Tìm lượt booking trước đó có STT cao nhất trong cùng dự án
+    const lastBooking = await db.booking.findFirst({
+      where: { projectId },
+      orderBy: { sttBooking: 'desc' }
     });
-    let nextStt = bookingCount + 1;
+
+    let nextStt = (lastBooking?.sttBooking || 0) + 1;
     let bookingCode = `BK-${project.code || 'PRJ'}-${String(nextStt).padStart(4, '0')}`;
     while (await db.booking.findUnique({ where: { maLuotBooking: bookingCode } })) {
       nextStt += 1;
@@ -100,9 +102,29 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
-    // Default match window: 3 days after project open
-    const defaultStartMatch = tgBatdaukhop ? new Date(tgBatdaukhop) : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const defaultEndMatch = tgKetthuckhopcan ? new Date(tgKetthuckhopcan) : new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000);
+    // Quy tắc khớp căn tuần tự 10 phút:
+    // STT 1: bắt đầu lúc 09h10, kết thúc 09h20
+    // STT 2: bắt đầu sau khi STT 1 kết thúc -> 09h20, kết thúc 09h30
+    // STT k: bắt đầu lúc STT(k-1).tgKetthuckhopcan, kết thúc sau 10 phút
+    let defaultStartMatch: Date;
+    if (tgBatdaukhop) {
+      defaultStartMatch = new Date(tgBatdaukhop);
+    } else if (lastBooking?.tgKetthuckhopcan) {
+      defaultStartMatch = new Date(lastBooking.tgKetthuckhopcan);
+    } else {
+      const baseStart = new Date(now);
+      baseStart.setHours(9, 10, 0, 0);
+      defaultStartMatch = baseStart;
+    }
+
+    const defaultEndMatch = tgKetthuckhopcan
+      ? new Date(tgKetthuckhopcan)
+      : new Date(defaultStartMatch.getTime() + 10 * 60 * 1000);
+
+    const startH = String(defaultStartMatch.getHours()).padStart(2, '0');
+    const startM = String(defaultStartMatch.getMinutes()).padStart(2, '0');
+    const endH = String(defaultEndMatch.getHours()).padStart(2, '0');
+    const endM = String(defaultEndMatch.getMinutes()).padStart(2, '0');
 
     const booking = await db.booking.create({
       data: {
@@ -114,10 +136,10 @@ export async function POST(request: Request) {
         tgBatdaukhop: defaultStartMatch,
         tgKetthuckhopcan: defaultEndMatch,
         trangthaikhopcan,
-        customerName: customerName || 'Khách hàng ưu tiên đợt 1',
+        customerName: customerName || `Khách hàng Ưu tiên #${nextStt}`,
         customerPhone: customerPhone || '0988888888',
         depositAmount: parseFloat(String(depositAmount)),
-        notes: notes || 'Đăng ký nguyện vọng căn tầng đẹp view thoáng'
+        notes: notes || `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (STT #${nextStt})`
       },
       include: {
         project: true,
