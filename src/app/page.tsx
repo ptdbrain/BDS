@@ -34,7 +34,6 @@ export default function Home() {
   const [customers, setCustomers] = useState<any[]>([]);
   const [contracts, setContracts] = useState<any[]>([]);
   const [reportData, setReportData] = useState<any>(null);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
@@ -143,17 +142,6 @@ export default function Home() {
     }
   };
 
-  // Fetch Audit Logs
-  const fetchAuditLogs = async () => {
-    try {
-      const res = await fetch('/api/v1/audit-logs');
-      const data = await res.json();
-      if (data.data) setAuditLogs(data.data);
-    } catch (err) {
-      console.error('Failed to fetch audit logs', err);
-    }
-  };
-
   // Master refresh all states
   const refreshAllData = useCallback(() => {
     fetchProducts();
@@ -161,7 +149,6 @@ export default function Home() {
     fetchCustomers();
     fetchContracts();
     fetchReportData();
-    fetchAuditLogs();
     setLastSyncTime(new Date().toLocaleTimeString('vi-VN'));
   }, [fetchProducts]);
 
