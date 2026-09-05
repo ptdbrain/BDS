@@ -9,7 +9,6 @@ import { LockManager } from '@/components/LockManager';
 import { CustomerManager } from '@/components/CustomerManager';
 import { ContractWorkflow } from '@/components/ContractWorkflow';
 import { ReportsDashboard } from '@/components/ReportsDashboard';
-import { AuditTrail } from '@/components/AuditTrail';
 import { ImportModal } from '@/components/ImportModal';
 import { PersonalRevenueView } from '@/components/PersonalRevenueView';
 import { VietQRModal } from '@/components/VietQRModal';
@@ -433,13 +432,6 @@ export default function Home() {
           {activeTab === 'reports' && (
             <ReportsDashboard
               reportData={reportData}
-              onRefresh={refreshAllData}
-            />
-          )}
-
-          {activeTab === 'audit' && (
-            <AuditTrail
-              logs={auditLogs}
               onRefresh={refreshAllData}
             />
           )}

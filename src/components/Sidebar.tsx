@@ -19,8 +19,7 @@ export type TabType =
   | 'transactions_revenue'
   | 'locks'
   | 'contracts'
-  | 'reports'
-  | 'audit';
+  | 'reports';
 
 interface SidebarProps {
   activeTab: TabType;

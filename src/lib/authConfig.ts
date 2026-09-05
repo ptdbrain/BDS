@@ -114,11 +114,10 @@ export const SSO_ACCOUNTS: SSOAccountConfig[] = [
     color: 'from-emerald-500 to-teal-500',
     badgeLabel: 'BAN GIÁM ĐỐC / QUẢN TRỊ',
     badgeColor: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    description: 'Toàn quyền điều hành cao cấp. Xem toàn bộ 3 Mẫu Báo Cáo Chuẩn AHS, bảng xếp hạng nhân viên và nhật ký kiểm toán hệ thống.',
+    description: 'Toàn quyền điều hành cao cấp. Xem toàn bộ 3 Mẫu Báo Cáo Chuẩn AHS, bảng xếp hạng nhân viên và tiến độ bán hàng dự án.',
     permissions: [
       'Toàn quyền truy cập tất cả phân hệ',
       'Xem 3 Mẫu Báo Cáo AHS (Doanh thu, Dự án, Doanh số NV)',
-      'Xem nhật ký kiểm toán hệ thống (Audit Trail)',
       'Phê duyệt hợp đồng mua bán & chính sách bán hàng',
       'Giám sát realtime toàn bộ quỹ căn và giao dịch'
     ]
