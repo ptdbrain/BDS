@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import ExcelJS from 'exceljs';
 
 import {
@@ -51,6 +51,17 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
   const [endDate, setEndDate] = useState<string>('2026-07-31');
   const [searchEmployee, setSearchEmployee] = useState<string>('');
 
+  // Internal reactive report data that responds to date filters
+  const [currentData, setCurrentData] = useState<any>(reportData);
+  const [isLoadingFilter, setIsLoadingFilter] = useState<boolean>(false);
+
+  // Sync when initial prop changes
+  useEffect(() => {
+    if (reportData) {
+      setCurrentData(reportData);
+    }
+  }, [reportData]);
+
   // Realtime date for "Ngày lập"
   const [realtimeDate, setRealtimeDate] = useState<string>(() => {
     return new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -59,10 +70,37 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
   // Export loading state
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  // Fetch report data for given dates
+  const fetchFilteredReport = useCallback(async (s?: string, e?: string) => {
+    const sDate = s !== undefined ? s : startDate;
+    const eDate = e !== undefined ? e : endDate;
+    setIsLoadingFilter(true);
+    try {
+      const params = new URLSearchParams();
+      if (sDate) params.append('startDate', sDate);
+      if (eDate) params.append('endDate', eDate);
+      const res = await fetch(`/api/v1/reports/dashboard?${params.toString()}`);
+      const json = await res.json();
+      if (json.data) {
+        setCurrentData(json.data);
+      }
+    } catch (err) {
+      console.error('Lỗi khi lọc số liệu báo cáo:', err);
+    } finally {
+      setIsLoadingFilter(false);
+    }
+  }, [startDate, endDate]);
+
+  // Automatically trigger report refetch whenever startDate or endDate changes
+  useEffect(() => {
+    fetchFilteredReport(startDate, endDate);
+  }, [startDate, endDate, fetchFilteredReport]);
 
   // Calculate formatted period for "Thời gian thống kê"
   const formattedPeriod = useMemo(() => {
-    if (!startDate || !endDate) return '01/06/2026 - 31/07/2026';
+    if (!startDate && !endDate) return 'Tất cả thời gian';
+    if (!startDate) return `Đến ${endDate}`;
+    if (!endDate) return `Từ ${startDate}`;
     try {
       const [sy, sm, sd] = startDate.split('-');
       const [ey, em, ed] = endDate.split('-');
@@ -72,7 +110,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
     }
   }, [startDate, endDate]);
 
-  const report1 = reportData?.report1_DoanhThu || {
+  const report1 = currentData?.report1_DoanhThu || {
     summary: {
       totalRevenue: 249474779035,
       totalContracts: 24,
@@ -90,7 +128,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
     data: []
   };
 
-  const report2 = reportData?.report2_SanPhamDuAn || {
+  const report2 = currentData?.report2_SanPhamDuAn || {
     summary: {
       totalUnits: 219,
       availableUnits: 79,
@@ -101,7 +139,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
     data: []
   };
 
-  const report3 = reportData?.report3_DoanhSoNV || {
+  const report3 = currentData?.report3_DoanhSoNV || {
     summary: {
       totalContracts: 24,
       totalRevenue: 249474779035,
@@ -111,7 +149,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
     data: []
   };
 
-  const kpis = reportData?.kpis || {
+  const kpis = currentData?.kpis || {
     totalProducts: 219,
     availableProducts: 79,
     lockedProducts: 0,
@@ -787,11 +825,15 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
 
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={onRefresh}
-              className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-white hover:border-brand-500/50 hover:bg-slate-800 shadow-lg transition active:scale-95"
+              onClick={() => {
+                fetchFilteredReport(startDate, endDate);
+                onRefresh();
+              }}
+              disabled={isLoadingFilter}
+              className="p-3 rounded-2xl bg-slate-900/90 border border-slate-700/80 text-slate-300 hover:text-white hover:border-brand-500/50 hover:bg-slate-800 shadow-lg transition active:scale-95 disabled:opacity-60"
               title="Làm mới số liệu"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isLoadingFilter ? 'animate-spin text-brand-400' : ''}`} />
             </button>
 
             <button
@@ -837,9 +879,12 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
           </div>
 
           {/* Thời gian thống kê - Interactive Date Picker (Từ ngày -> Đến ngày) */}
-          <div className="flex flex-wrap items-center gap-2.5 bg-slate-950/80 border border-slate-800 px-4 py-2 rounded-2xl shadow-inner">
-            <Calendar className="w-4 h-4 text-brand-400" />
-            <span className="text-slate-400 font-semibold">Thời gian thống kê:</span>
+          <div className="flex flex-wrap items-center gap-3 bg-slate-950/85 border border-slate-800 px-4 py-2 rounded-2xl shadow-inner">
+            <div className="flex items-center space-x-2 text-brand-400 font-bold text-xs">
+              <Calendar className="w-4 h-4 text-brand-400" />
+              <span>Thời gian thống kê:</span>
+            </div>
+
             <div className="flex items-center space-x-2">
               <span className="text-slate-500 text-[11px] font-medium">Từ</span>
               <input
@@ -858,6 +903,91 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
                 className="bg-slate-900 border border-slate-700/90 hover:border-brand-500/80 rounded-xl px-3 py-1.5 text-xs text-brand-300 font-bold focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition cursor-pointer"
                 title="Chọn ngày kết thúc"
               />
+            </div>
+
+            {/* Quick preset buttons */}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-slate-800">
+              <button
+                type="button"
+                onClick={() => { setStartDate('2026-06-01'); setEndDate('2026-06-30'); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  startDate === '2026-06-01' && endDate === '2026-06-30'
+                    ? 'bg-brand-500/25 text-brand-300 border border-brand-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                T6/2026
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartDate('2026-07-01'); setEndDate('2026-07-31'); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  startDate === '2026-07-01' && endDate === '2026-07-31'
+                    ? 'bg-brand-500/25 text-brand-300 border border-brand-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                T7/2026
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartDate('2026-06-01'); setEndDate('2026-07-31'); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  startDate === '2026-06-01' && endDate === '2026-07-31'
+                    ? 'bg-brand-500/25 text-brand-300 border border-brand-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                T6 - T7
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartDate('2026-01-01'); setEndDate('2026-12-31'); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  startDate === '2026-01-01' && endDate === '2026-12-31'
+                    ? 'bg-brand-500/25 text-brand-300 border border-brand-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                Cả năm
+              </button>
+              <button
+                type="button"
+                onClick={() => { setStartDate(''); setEndDate(''); }}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
+                  !startDate && !endDate
+                    ? 'bg-brand-500/25 text-brand-300 border border-brand-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                }`}
+              >
+                Tất cả
+              </button>
+            </div>
+
+            {/* Filter action button */}
+            <button
+              type="button"
+              onClick={() => fetchFilteredReport(startDate, endDate)}
+              disabled={isLoadingFilter}
+              className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-600 to-blue-600 hover:from-brand-500 hover:to-blue-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-md shadow-brand-500/20 transition active:scale-95 disabled:opacity-60"
+            >
+              {isLoadingFilter ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Đang lọc...</span>
+                </>
+              ) : (
+                <>
+                  <Filter className="w-3.5 h-3.5" />
+                  <span>Lọc số liệu</span>
+                </>
+              )}
+            </button>
+
+            {/* Indicator badge showing matching contracts */}
+            <div className="hidden xl:flex items-center space-x-1.5 text-xs text-slate-400 pl-2 border-l border-slate-800">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Tìm thấy: <strong className="text-white font-bold">{report1.summary.totalContracts}</strong> HĐ ({formatVND(report1.summary.totalRevenue)})</span>
             </div>
           </div>
         </div>
@@ -914,11 +1044,13 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
         </button>
       </div>
 
-      {/* ============================================================= */}
-      {/* TAB 1: BÁO CÁO DOANH THU THEO THỜI GIAN (BC_DOANHTHU)           */}
-      {/* ============================================================= */}
-      {activeTab === 'bc_doanhthu' && (
-        <div className="space-y-6">
+      {/* Content wrapper with loading transition */}
+      <div className={`transition-opacity duration-300 ${isLoadingFilter ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+        {/* ============================================================= */}
+        {/* TAB 1: BÁO CÁO DOANH THU THEO THỜI GIAN (BC_DOANHTHU)           */}
+        {/* ============================================================= */}
+        {activeTab === 'bc_doanhthu' && (
+          <div className="space-y-6">
           {/* KPI Indicators */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
@@ -1517,7 +1649,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
               </h3>
 
               <div className="space-y-3">
-                {(reportData?.leaderboard || []).slice(0, 5).map((emp: any, idx: number) => (
+                {(currentData?.leaderboard || []).slice(0, 5).map((emp: any, idx: number) => (
                   <div key={emp.id || emp.maNV} className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 hover:border-brand-500/40 transition-colors shadow-sm">
                     <div className="flex items-center space-x-3.5">
                       <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shadow-md ${
@@ -1543,6 +1675,7 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

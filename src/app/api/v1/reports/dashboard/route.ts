@@ -60,12 +60,27 @@ export async function GET(request: Request) {
 
     // Filter contracts by date if provided
     let filteredContracts = contracts;
+    let startDateObj: Date | null = null;
+    let endDateObj: Date | null = null;
+
     if (startDateParam || endDateParam) {
-      const start = startDateParam ? new Date(startDateParam) : new Date(0);
-      const end = endDateParam ? new Date(endDateParam) : new Date(8640000000000000);
+      if (startDateParam) {
+        startDateObj = new Date(startDateParam);
+        startDateObj.setHours(0, 0, 0, 0);
+      }
+      if (endDateParam) {
+        endDateObj = new Date(endDateParam);
+        endDateObj.setHours(23, 59, 59, 999);
+      }
+
+      const start = startDateObj || new Date(0);
+      const end = endDateObj || new Date(8640000000000000);
+
       filteredContracts = contracts.filter(c => {
-        const d = c.signedDate || c.signedAt || c.createdAt;
-        return d && d >= start && d <= end;
+        const d = c.signedDate || c.signedAt || c.thoigiankiHDMB || c.createdAt;
+        if (!d) return false;
+        const time = new Date(d).getTime();
+        return time >= start.getTime() && time <= end.getTime();
       });
     }
 
@@ -73,14 +88,26 @@ export async function GET(request: Request) {
     // 1. BÁO CÁO 1: BC_DoanhThu (Báo cáo doanh thu theo thời gian)
     // -------------------------------------------------------------
     const totalContractRevenue = filteredContracts.reduce((acc, c) => acc + (c.agreedPrice || c.dealRevenue || 0), 0);
-    const totalDepositRevenue = succeededPayments.reduce((acc, p) => acc + p.amount, 0);
+    
+    // Filter payments in date range
+    const filteredPayments = succeededPayments.filter(p => {
+      if (!startDateObj && !endDateObj) return true;
+      const pt = new Date(p.createdAt || p.paidAt || 0).getTime();
+      const st = (startDateObj || new Date(0)).getTime();
+      const et = (endDateObj || new Date(8640000000000000)).getTime();
+      return pt >= st && pt <= et;
+    });
+    const totalDepositRevenue = filteredPayments.reduce((acc, p) => acc + p.amount, 0);
 
-    // Group 12 months in 2026
+    // Group months within the selected date window
+    const startM = startDateObj ? (startDateObj.getMonth() + 1) : 1;
+    const endM = endDateObj ? (endDateObj.getMonth() + 1) : 12;
+
     const monthlyRevenue = [];
-    for (let m = 1; m <= 12; m++) {
+    for (let m = startM; m <= endM; m++) {
       const monthStr = `${String(m).padStart(2, '0')}/2026`;
       const monthContracts = filteredContracts.filter(c => {
-        const d = c.signedDate || c.signedAt || c.createdAt;
+        const d = c.signedDate || c.signedAt || c.thoigiankiHDMB || c.createdAt;
         if (!d) return false;
         const dateObj = new Date(d);
         return dateObj.getFullYear() === 2026 && dateObj.getMonth() + 1 === m;
@@ -96,6 +123,7 @@ export async function GET(request: Request) {
       else if (m === 7) notes = 'Đợt 2 Masteri Grand Coast';
       else if (m === 10) notes = 'Khớp đợt 3 mùa thu';
       else if (m === 12) notes = 'Tổng kết kinh doanh cuối năm';
+      else if (mCount > 0) notes = `Thực hiện ${mCount} hợp đồng trong kỳ`;
 
       monthlyRevenue.push({
         month: monthStr,
@@ -108,6 +136,20 @@ export async function GET(request: Request) {
       });
     }
 
+    // Format Period string
+    const formatPeriodString = () => {
+      if (startDateParam && endDateParam) {
+        try {
+          const [sy, sm, sd] = startDateParam.split('-');
+          const [ey, em, ed] = endDateParam.split('-');
+          return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
+        } catch {
+          return `${startDateParam} - ${endDateParam}`;
+        }
+      }
+      return '01/06/2026 - 31/07/2026';
+    };
+
     // Summary indicators
     const bcDoanhThuSummary = {
       totalRevenue: totalContractRevenue,
@@ -118,8 +160,8 @@ export async function GET(request: Request) {
         address: 'Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
         phone: '0964960955',
         creator: 'Hoàng Thị Hương Giang',
-        createdDate: '03/09/2026',
-        period: startDateParam && endDateParam ? `${startDateParam} - ${endDateParam}` : '01/06/2026 - 31/07/2026',
+        createdDate: new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        period: formatPeriodString(),
         sourceLink: 'https://ahsproperty.vn/lien-he/'
       }
     };
@@ -127,15 +169,24 @@ export async function GET(request: Request) {
     // -------------------------------------------------------------
     // 2. BÁO CÁO 2: BC_SanPham_DuAn (Lượng sản phẩm bán theo dự án)
     // -------------------------------------------------------------
-    // Ghi chú trong file mẫu Excel: "Sản phẩm có trạng thái 'Đã khớp' được tính vào nhóm đã bán trong báo cáo mẫu"
+    const isDateFiltered = Boolean(startDateParam || endDateParam);
     const projectSales = projects.map(proj => {
       const prods = proj.products;
       const totalUnits = prods.length;
-      const availableUnits = prods.filter(p => p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng').length;
       
-      // Sản phẩm đã bán: status 'SOLD' hoặc trạng thái 'Đã khớp' theo ghi chú nghiệp vụ của file mẫu
-      const soldUnits = prods.filter(p => p.status === 'SOLD' || p.trangthai === 'Đã khớp' || p.trangthai === 'Đã bán').length;
-      const lockedUnits = prods.filter(p => p.status === 'LOCKED' && p.trangthai !== 'Đã khớp').length;
+      const projFilteredContracts = filteredContracts.filter(c => 
+        c.product?.projectId === proj.id || prods.some(p => p.id === c.productId)
+      );
+
+      const soldUnits = isDateFiltered
+        ? projFilteredContracts.length
+        : prods.filter(p => p.status === 'SOLD' || p.trangthai === 'Đã khớp' || p.trangthai === 'Đã bán').length;
+      
+      const availableUnits = isDateFiltered
+        ? Math.max(0, totalUnits - soldUnits)
+        : prods.filter(p => p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng').length;
+
+      const lockedUnits = isDateFiltered ? 0 : prods.filter(p => p.status === 'LOCKED' && p.trangthai !== 'Đã khớp').length;
       const soldRate = totalUnits > 0 ? (soldUnits / totalUnits) : 0;
 
       return {
@@ -206,11 +257,13 @@ export async function GET(request: Request) {
           availableProducts,
           lockedProducts,
           depositedProducts,
-          soldProducts,
+          soldProducts: isDateFiltered ? filteredContracts.length : soldProducts,
           totalDepositRevenue,
           totalContractRevenue,
           activeLocksCount: lockedProducts,
-          conversionRate: totalProducts > 0 ? (((depositedProducts + soldProducts) / totalProducts) * 100).toFixed(1) : '0'
+          conversionRate: totalProducts > 0
+            ? ((((isDateFiltered ? 0 : depositedProducts) + (isDateFiltered ? filteredContracts.length : soldProducts)) / totalProducts) * 100).toFixed(1)
+            : '0'
         },
         // 3 Mẫu Báo Cáo Chuẩn AHS
         report1_DoanhThu: {
