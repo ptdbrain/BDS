@@ -47,8 +47,26 @@ interface ReportsDashboardProps {
 
 export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProps) {
   const [activeTab, setActiveTab] = useState<'bc_doanhthu' | 'bc_sanpham_duan' | 'bc_doanhso_nv' | 'kpi_dashboard'>('bc_doanhthu');
-  const [dateRange, setDateRange] = useState<'sample_period' | 'full_year' | 'custom'>('sample_period');
+  const [startDate, setStartDate] = useState<string>('2026-06-01');
+  const [endDate, setEndDate] = useState<string>('2026-07-31');
   const [searchEmployee, setSearchEmployee] = useState<string>('');
+
+  // Realtime date for "Ngày lập"
+  const [realtimeDate, setRealtimeDate] = useState<string>(() => {
+    return new Date().toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  });
+
+  // Calculate formatted period for "Thời gian thống kê"
+  const formattedPeriod = useMemo(() => {
+    if (!startDate || !endDate) return '01/06/2026 - 31/07/2026';
+    try {
+      const [sy, sm, sd] = startDate.split('-');
+      const [ey, em, ed] = endDate.split('-');
+      return `${sd}/${sm}/${sy} - ${ed}/${em}/${ey}`;
+    } catch (e) {
+      return `${startDate} - ${endDate}`;
+    }
+  }, [startDate, endDate]);
 
   const report1 = reportData?.report1_DoanhThu || {
     summary: {
@@ -60,8 +78,8 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
         address: 'Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
         phone: '0964960955',
         creator: 'Hoàng Thị Hương Giang',
-        createdDate: '03/09/2026',
-        period: '01/06/2026 - 31/07/2026',
+        createdDate: realtimeDate,
+        period: formattedPeriod,
         sourceLink: 'https://ahsproperty.vn/lien-he/'
       }
     },
@@ -451,31 +469,48 @@ export function ReportsDashboard({ reportData, onRefresh }: ReportsDashboardProp
         {/* Thông tin lập báo cáo */}
         <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
           <div className="flex flex-wrap items-center gap-4">
-            <div>
-              <span className="text-slate-500">Người lập:</span> <span className="font-semibold text-slate-200">{company.creator}</span>
+            <div className="flex items-center space-x-1.5 bg-slate-900/80 border border-slate-800/80 px-3 py-1.5 rounded-xl">
+              <span className="text-slate-400">Người lập:</span>
+              <span className="font-semibold text-slate-100">{company.creator}</span>
             </div>
-            <div className="hidden sm:block text-slate-600">•</div>
-            <div>
-              <span className="text-slate-500">Ngày lập:</span> <span className="font-semibold text-slate-200">{company.createdDate}</span>
-            </div>
-            <div className="hidden sm:block text-slate-600">•</div>
-            <div>
-              <span className="text-slate-500">Thời gian thống kê:</span> <span className="font-semibold text-brand-400">{company.period}</span>
+
+            {/* Ngày lập - Realtime Indicator */}
+            <div className="flex items-center space-x-2 bg-slate-900/80 border border-slate-800/80 px-3 py-1.5 rounded-xl">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-slate-400">Ngày lập:</span>
+              <span className="font-bold text-slate-100">{realtimeDate}</span>
+              <span className="text-[10px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/20 uppercase tracking-wider">
+                Realtime
+              </span>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-xl">
+          {/* Thời gian thống kê - Interactive Date Picker (Từ ngày -> Đến ngày) */}
+          <div className="flex flex-wrap items-center gap-2 bg-slate-900/90 border border-slate-800 px-3.5 py-1.5 rounded-xl shadow-inner">
             <Calendar className="w-3.5 h-3.5 text-brand-400" />
-            <span className="text-slate-400">Kỳ báo cáo:</span>
-            <select
-              value={dateRange}
-              onChange={(e: any) => setDateRange(e.target.value)}
-              className="bg-transparent text-slate-200 font-medium outline-none cursor-pointer"
-            >
-              <option value="sample_period" className="bg-slate-900">Kỳ Mẫu (01/06/2026 - 31/07/2026)</option>
-              <option value="full_year" className="bg-slate-900">Toàn Bộ Năm 2026</option>
-              <option value="custom" className="bg-slate-900">Tùy Chọn Khoảng Ngày</option>
-            </select>
+            <span className="text-slate-400 font-medium">Thời gian thống kê:</span>
+            <div className="flex items-center space-x-2">
+              <span className="text-slate-500 text-[11px] font-medium">Từ</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-slate-950 border border-slate-700/80 hover:border-brand-500/60 rounded-lg px-2.5 py-1 text-xs text-brand-300 font-semibold focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition cursor-pointer"
+                title="Chọn ngày bắt đầu"
+              />
+              <span className="text-brand-400 font-bold">➔</span>
+              <span className="text-slate-500 text-[11px] font-medium">Đến</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-slate-950 border border-slate-700/80 hover:border-brand-500/60 rounded-lg px-2.5 py-1 text-xs text-brand-300 font-semibold focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition cursor-pointer"
+                title="Chọn ngày kết thúc"
+              />
+            </div>
           </div>
         </div>
       </div>

@@ -13,9 +13,12 @@ import {
   Zap,
   ArrowRight,
   ShieldCheck,
-  Eye
+  Eye,
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
+import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 
 interface LockManagerProps {
   locks: any[];
@@ -23,6 +26,7 @@ interface LockManagerProps {
   onCancelLock: (lockId: string) => void;
   onProceedToCustomer: (lock: any) => void;
   currentRole?: UserRole;
+  currentUser?: any;
 }
 
 export function LockManager({
@@ -30,7 +34,8 @@ export function LockManager({
   onRefresh,
   onCancelLock,
   onProceedToCustomer,
-  currentRole = 'SALES'
+  currentRole = 'SALES',
+  currentUser
 }: LockManagerProps) {
   const [isConfirmingTransfer, setIsConfirmingTransfer] = useState<string | null>(null);
   const [selectedLockForQR, setSelectedLockForQR] = useState<any | null>(null);
@@ -38,6 +43,15 @@ export function LockManager({
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
   const [simulationResult, setSimulationResult] = useState<any | null>(null);
   const [now, setNow] = useState<number>(Date.now());
+  const [contractModalData, setContractModalData] = useState<{
+    isOpen: boolean;
+    contract: any | null;
+    product: any | null;
+  }>({
+    isOpen: false,
+    contract: null,
+    product: null
+  });
 
   // Live timer tick
   useEffect(() => {
@@ -255,16 +269,23 @@ export function LockManager({
                       <p className="text-[11px] text-slate-400">{lock.product?.project?.name || 'AHS Grand Horizon'}</p>
                     </div>
 
-                    {/* Timer Badge */}
-                    <div
-                      className={`px-3 py-1.5 rounded-xl font-mono text-xs font-black flex items-center space-x-1.5 shadow-md ${
-                        timer.isWarning
-                          ? 'bg-rose-500 text-white animate-pulse'
-                          : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                      }`}
-                    >
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{timer.text}</span>
+                    {/* Status & Timer Badge */}
+                    <div className="flex items-center space-x-1.5">
+                      {lock.status === 'PAYMENT_PENDING' && (
+                        <span className="px-2 py-1 rounded-lg text-[10px] font-black uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                          Chờ Admin Duyệt Cọc
+                        </span>
+                      )}
+                      <div
+                        className={`px-3 py-1.5 rounded-xl font-mono text-xs font-black flex items-center space-x-1.5 shadow-md ${
+                          timer.isWarning
+                            ? 'bg-rose-500 text-white animate-pulse'
+                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                        }`}
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{timer.text}</span>
+                      </div>
                     </div>
                   </div>
 
@@ -384,15 +405,31 @@ export function LockManager({
                         <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">{lock.status}</span>
                       )}
                     </td>
-                    <td className="p-3.5 text-right">
+                    <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                       {isDeposited && (
-                        <button
-                          onClick={() => onProceedToCustomer(lock)}
-                          className="px-3 py-1.5 rounded-xl bg-brand-600 text-white hover:bg-brand-500 text-[11px] font-bold transition flex items-center space-x-1 ml-auto"
-                        >
-                          <span>Khai Báo Khách Hàng</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => {
+                              setContractModalData({
+                                isOpen: true,
+                                contract: null,
+                                product: lock.product
+                              });
+                            }}
+                            className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-[11px] font-bold transition inline-flex items-center space-x-1 shadow-md"
+                          >
+                            <FileSpreadsheet className="w-3.5 h-3.5" />
+                            <span>Nhập Hợp Đồng Toàn Bộ</span>
+                          </button>
+
+                          <button
+                            onClick={() => onProceedToCustomer(lock)}
+                            className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-[11px] font-bold transition inline-flex items-center space-x-1"
+                          >
+                            <span>Khách Hàng</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -535,6 +572,19 @@ export function LockManager({
           </div>
         </div>
       )}
+
+      {/* COMPREHENSIVE CONTRACT MODAL (SẢN PHẨM + HỢP ĐỒNG TOÀN BỘ) */}
+      <ComprehensiveContractModal
+        isOpen={contractModalData.isOpen}
+        onClose={() => setContractModalData({ isOpen: false, contract: null, product: null })}
+        contract={contractModalData.contract}
+        product={contractModalData.product}
+        currentRole={currentRole}
+        currentUser={currentUser}
+        onSuccess={() => {
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

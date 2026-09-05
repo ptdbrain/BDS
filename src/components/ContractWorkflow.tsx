@@ -22,12 +22,14 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
+import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 
 interface ContractWorkflowProps {
   contracts: any[];
   products: any[];
   customers: any[];
   currentRole: UserRole;
+  currentUser?: any;
   onRefresh: () => void;
 }
 
@@ -36,10 +38,20 @@ export function ContractWorkflow({
   products,
   customers,
   currentRole,
+  currentUser,
   onRefresh
 }: ContractWorkflowProps) {
   const [isInvestorModalOpen, setIsInvestorModalOpen] = useState<boolean>(false);
   const [editingContract, setEditingContract] = useState<any | null>(null);
+  const [comprehensiveContractData, setComprehensiveContractData] = useState<{
+    isOpen: boolean;
+    contract: any | null;
+    product: any | null;
+  }>({
+    isOpen: false,
+    contract: null,
+    product: null
+  });
 
   // Form State for Sales Admin Investor Contract entry
   const [investorFormData, setInvestorFormData] = useState({
@@ -369,6 +381,14 @@ export function ContractWorkflow({
                       </td>
                       <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                         <button
+                          onClick={() => setComprehensiveContractData({ isOpen: true, contract: ct, product: ct.product })}
+                          className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-brand-600 to-accent-cyan text-white hover:brightness-110 text-[11px] font-bold transition shadow-md"
+                          title="Mở bảng thông tin toàn bộ hợp đồng (Lớp Sản Phẩm + Lớp Hợp Đồng)"
+                        >
+                          Hợp Đồng Toàn Bộ
+                        </button>
+
+                        <button
                           onClick={() => handleExportContractPDF(ct)}
                           className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-white text-[11px] font-semibold transition"
                           title="Xuất file PDF"
@@ -615,6 +635,19 @@ export function ContractWorkflow({
           </div>
         </div>
       )}
+
+      {/* COMPREHENSIVE CONTRACT MODAL (SẢN PHẨM + HỢP ĐỒNG TOÀN BỘ) */}
+      <ComprehensiveContractModal
+        isOpen={comprehensiveContractData.isOpen}
+        onClose={() => setComprehensiveContractData({ isOpen: false, contract: null, product: null })}
+        contract={comprehensiveContractData.contract}
+        product={comprehensiveContractData.product}
+        currentRole={currentRole}
+        currentUser={currentUser}
+        onSuccess={() => {
+          onRefresh();
+        }}
+      />
     </div>
   );
 }

@@ -380,6 +380,8 @@ export default function Home() {
               products={products}
               projects={projects}
               currentRole={currentRole}
+              currentUser={currentUser}
+              contracts={contracts}
               selectedProjectId={selectedProjectId}
               onSelectProject={setSelectedProjectId}
               onLockProduct={handleLockProduct}
@@ -405,6 +407,7 @@ export default function Home() {
               onCancelLock={handleCancelLock}
               onProceedToCustomer={handleProceedToCustomer}
               currentRole={currentRole}
+              currentUser={currentUser}
             />
           )}
 
@@ -422,6 +425,7 @@ export default function Home() {
               products={products}
               customers={customers}
               currentRole={currentRole}
+              currentUser={currentUser}
               onRefresh={refreshAllData}
             />
           )}

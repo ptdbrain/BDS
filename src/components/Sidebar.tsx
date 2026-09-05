@@ -97,7 +97,7 @@ export function Sidebar({
     },
     {
       id: 'reports' as TabType,
-      label: '3. Báo Cáo Quỹ Căn & Dự Án',
+      label: 'Báo Cáo',
       desc: 'Tiến độ bán & tỷ lệ hấp thụ',
       icon: BarChart3,
       badge: null
@@ -135,7 +135,7 @@ export function Sidebar({
     }
   ];
 
-  // 4. Executive Management
+  // 4. Executive Management (Giám đốc)
   const managerNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
@@ -170,16 +170,9 @@ export function Sidebar({
     },
     {
       id: 'reports' as TabType,
-      label: 'Báo Cáo & KPI',
+      label: 'Báo Cáo',
       desc: 'Doanh thu & Xuất PDF',
       icon: BarChart3,
-      badge: null
-    },
-    {
-      id: 'audit' as TabType,
-      label: 'Nhật Ký Kiểm Toán',
-      desc: 'Audit trail hệ thống',
-      icon: ShieldCheck,
       badge: null
     }
   ];

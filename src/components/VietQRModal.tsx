@@ -83,31 +83,17 @@ export function VietQRModal({
   const handleSimulatePayment = async () => {
     setIsProcessing(true);
     try {
-      // Simulate VietQR payment webhook confirmation
-      const paymentRef = `VTQR-${Date.now()}`;
-      const res = await fetch('/api/v1/payments/webhooks/vietqr', {
+      // Gửi yêu cầu xác nhận thanh toán cọc sang Sales Admin
+      const res = await fetch(`/api/v1/locks/${lock.id}/confirm-payment-sales`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-vietqr-signature': 'SIMULATED_AUTHORIZED_WEBHOOK'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          lockId: lock.id,
-          amount: depositAmount,
-          transactionRef: paymentRef,
-          bankReference: `MB${Date.now()}`,
-          status: 'SUCCESS'
+          notes: `Sales xác nhận khách hàng đã chuyển khoản cọc VietQR 100M cho căn ${productCode}`
         })
       });
 
-      if (res.ok || res.status === 200) {
-        setIsPaid(true);
-        onPaymentSuccess();
-      } else {
-        // Fallback lock update to DEPOSIT_CONFIRMED
-        setIsPaid(true);
-        onPaymentSuccess();
-      }
+      setIsPaid(true);
+      onPaymentSuccess();
     } catch (err) {
       console.error(err);
       setIsPaid(true);
@@ -242,9 +228,9 @@ export function VietQRModal({
               </div>
 
               <div>
-                <h3 className="text-xl font-black text-white">Thanh Toán Cọc Thành Công!</h3>
+                <h3 className="text-xl font-black text-white">Đã Gửi Xác Nhận Thanh Toán!</h3>
                 <p className="text-xs text-slate-300 mt-1 max-w-sm mx-auto">
-                  Căn hộ <strong>{productCode}</strong> đã được khóa cọc thành công và chuyển trạng thái <strong>Đã Bán</strong>.
+                  Căn hộ <strong>{productCode}</strong> đang được giữ căn 30 phút. Thông báo đã được gửi đến Sales Admin để xác nhận thanh toán và duyệt chuyển trạng thái Đã Bán.
                 </p>
               </div>
 
@@ -256,8 +242,7 @@ export function VietQRModal({
                   }}
                   className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-400 hover:to-purple-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-brand-500/30 transition"
                 >
-                  <span>Chuyển Sang Khai Báo Khách Hàng</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <span>Hoàn Tất & Đóng</span>
                 </button>
               </div>
             </div>
