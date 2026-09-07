@@ -64,6 +64,25 @@ B-1202,Tower B,12,74.5,Đông Nam,4842500000,Hoàn thiện cao cấp`;
       const data = await res.json();
       setImportResult(data.data);
       if (data.data?.success > 0) {
+        try {
+          const stored = localStorage.getItem('ahs_custom_products');
+          const list = stored ? JSON.parse(stored) : [];
+          for (const item of parsedData) {
+            const prod = {
+              ...item,
+              projectId,
+              status: item.status || 'AVAILABLE',
+              trangthai: item.status || 'Còn hàng',
+              prices: [{ amount: item.amount, depositAmount: 100000000 }]
+            };
+            if (!list.some((p: any) => p.productCode === prod.productCode)) {
+              list.push(prod);
+            }
+          }
+          localStorage.setItem('ahs_custom_products', JSON.stringify(list));
+        } catch (e) {
+          console.error('Failed to cache imported products:', e);
+        }
         onSuccess();
       }
     } catch (err: any) {

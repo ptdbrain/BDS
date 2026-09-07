@@ -96,6 +96,26 @@ export function AddProductModal({
         return;
       }
 
+      // Persist newly added product in localStorage for seamless multi-container serverless availability
+      try {
+        const stored = localStorage.getItem('ahs_custom_products');
+        const list = stored ? JSON.parse(stored) : [];
+        const fullProd = {
+          ...data.data,
+          projectId,
+          prices: [{
+            amount: parseFloat(formData.amount),
+            depositAmount: parseFloat(formData.depositAmount)
+          }]
+        };
+        // Avoid duplicate codes
+        const filtered = list.filter((p: any) => p.id !== fullProd.id && p.productCode !== fullProd.productCode);
+        filtered.push(fullProd);
+        localStorage.setItem('ahs_custom_products', JSON.stringify(filtered));
+      } catch (e) {
+        console.error('Failed to cache product in localStorage:', e);
+      }
+
       setSuccessMsg(`Đã thêm thành công căn ${formData.productCode} vào quỹ hàng!`);
       setTimeout(() => {
         onSuccess();

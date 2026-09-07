@@ -28,9 +28,14 @@ export async function POST(request: Request) {
   try {
     const idempotencyKey = request.headers.get('Idempotency-Key') || undefined;
     const body = await request.json();
-    const { productId, salesEmployeeId = 'emp_sales_01', salesEmployeeName = 'Trần Văn Nam' } = body;
+    const {
+      productId,
+      salesEmployeeId = 'emp_sales_01',
+      salesEmployeeName = 'Trần Văn Nam',
+      productData
+    } = body;
 
-    if (!productId) {
+    if (!productId && !productData?.id && !productData?.productCode) {
       return NextResponse.json({
         type: 'urn:ahs:problem:validation-failed',
         title: 'Dữ liệu không hợp lệ',
@@ -40,12 +45,15 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
+    const effectiveProductId = productId || productData?.id || productData?.productCode;
+
     try {
       const lockResult = await acquireProductLock({
-        productId,
+        productId: effectiveProductId,
         salesEmployeeId,
         salesEmployeeName,
-        idempotencyKey
+        idempotencyKey,
+        productData
       });
 
       return NextResponse.json({ data: lockResult });

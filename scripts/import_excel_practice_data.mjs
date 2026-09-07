@@ -323,6 +323,7 @@ async function main() {
       }
     });
     paymentPlanMap.set(row.MaDA, plan);
+    paymentPlanMap.set(proj.id, plan);
   }
   console.log(`✓ Đã nạp ${daRows.length} Dự án:`, [...projectMap.keys()]);
 
@@ -529,8 +530,8 @@ async function main() {
   }
   console.log(`✓ Đã nạp ${bkRows.length} lượt Booking theo chuỗi 10 phút nối tiếp (09h10-09h20, 09h20-09h30,...).`);
 
-  // 8. LuotLock (40 lượt) & HopDong (24 hợp đồng)
-  console.log('🔒 & 📜 9/9 Nạp bảng LuotLock (40) & HopDong (24) kèm Giao Dịch & Khách Hàng...');
+  // 8. LuotLock & HopDong kèm Giao Dịch & Khách Hàng
+  console.log('🔒 & 📜 9/9 Nạp bảng LuotLock & HopDong kèm Giao Dịch & Khách Hàng...');
   const llRows = XLSX.utils.sheet_to_json(wb.Sheets['LuotLock']);
   const lockMap = new Map();
 
@@ -567,7 +568,9 @@ async function main() {
         ghichu: row.GhiChu
       }
     });
-    lockMap.set(row.MaCan, lock);
+    if (isSuccess || !lockMap.has(row.MaCan)) {
+      lockMap.set(row.MaCan, lock);
+    }
 
     // Ghi nhận Payment Transaction cho Sales Admin & Báo cáo
     await prisma.paymentTransaction.create({

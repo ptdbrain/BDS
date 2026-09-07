@@ -1,5 +1,6 @@
 import { db } from './db';
 import { createAuditLog } from './audit';
+import { ensureProductExists } from './productHelper';
 
 export async function sweepExpiredLocks() {
   const now = new Date();
@@ -62,12 +63,14 @@ export async function acquireProductLock({
   productId,
   salesEmployeeId,
   salesEmployeeName,
-  idempotencyKey
+  idempotencyKey,
+  productData
 }: {
   productId: string;
   salesEmployeeId: string;
   salesEmployeeName: string;
   idempotencyKey?: string;
+  productData?: any;
 }) {
   // Sweep expired locks first
   await sweepExpiredLocks();
@@ -93,10 +96,29 @@ export async function acquireProductLock({
   }
 
   // Pre-fetch product price and duration outside transaction
-  const product = await db.product.findUnique({
+  let product = await db.product.findUnique({
     where: { id: productId },
     include: { project: true, prices: true }
   });
+
+  // Self-healing for Vercel multi-container serverless SQLite
+  if (!product && productData) {
+    product = await ensureProductExists({ ...productData, id: productId });
+  }
+
+  // Fallback check by productCode or maCan if productId might be a product code
+  if (!product) {
+    product = await db.product.findFirst({
+      where: {
+        OR: [
+          { id: productId },
+          { productCode: productId },
+          { maCan: productId }
+        ]
+      },
+      include: { project: true, prices: true }
+    });
+  }
 
   if (!product) {
     throw new Error('PRODUCT_NOT_FOUND');
@@ -108,7 +130,7 @@ export async function acquireProductLock({
       // Atomic conditional update to prevent race condition
       const updatedCount = await tx.product.updateMany({
         where: {
-          id: productId,
+          id: product.id,
           status: 'AVAILABLE'
         },
         data: {
@@ -129,12 +151,12 @@ export async function acquireProductLock({
 
       const lock = await tx.productLock.create({
         data: {
-          productId,
+          productId: product.id,
           salesEmployeeId: validSalesId,
           status: 'ACTIVE',
           startedAt: new Date(),
           expiresAt,
-          idempotencyKey: idempotencyKey || `lock-${validSalesId}-${productId}-${Date.now()}`
+          idempotencyKey: idempotencyKey || `lock-${validSalesId}-${product.id}-${Date.now()}`
         }
       });
 
@@ -158,7 +180,7 @@ export async function acquireProductLock({
       // Record status history
       await tx.productStatusHistory.create({
         data: {
-          productId,
+          productId: product.id,
           fromStatus: 'AVAILABLE',
           toStatus: 'LOCKED',
           reason: `Khóa giữ căn ${lockDurationMinutes} phút bởi Sales: ${salesEmployeeName}`,

@@ -145,7 +145,8 @@ export function ComprehensiveContractModal({
           productId: activeProduct?.id,
           salesEmployeeId: currentUser?.id || 'NV001',
           ...formData,
-          status: 'PENDING_REVIEW' // Chờ Sales Admin duyệt
+          status: 'PENDING_REVIEW', // Chờ Sales Admin duyệt
+          productData: activeProduct
         })
       });
 
@@ -171,19 +172,27 @@ export function ComprehensiveContractModal({
 
   // Sales Admin Approve
   const handleApprove = async () => {
-    if (!contract?.id) return;
+    const contractId = contract?.id || formData.maHopdong || activeProduct?.id;
+    if (!contractId) return;
+    setErrorMessage(null);
+    setSuccessMessage(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/contracts/${contract.id}/approve`, {
+      const res = await fetch(`/api/v1/contracts/${contractId}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
           reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
-          reason: 'Thông tin hợp đồng và pháp lý khách hàng đầy đủ, chính xác.'
+          reason: 'Thông tin hợp đồng và pháp lý khách hàng đầy đủ, chính xác.',
+          contractData: contract ? { ...contract, ...formData } : formData,
+          productData: activeProduct,
+          contractNumber: contract?.contractNumber || formData.maHopdong,
+          productId: activeProduct?.id
         })
       });
-      if (!res.ok) throw new Error('Duyệt hợp đồng thất bại');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Duyệt hợp đồng thất bại');
 
       setSuccessMessage('Đã duyệt và ký hợp đồng thành công! Doanh số và hoa hồng đã được ghi nhận.');
       broadcastSync('CONTRACT_UPDATED');
@@ -202,22 +211,30 @@ export function ComprehensiveContractModal({
 
   // Sales Admin Request Changes
   const handleRequestChanges = async () => {
-    if (!contract?.id || !rejectReason.trim()) {
+    const contractId = contract?.id || formData.maHopdong || activeProduct?.id;
+    if (!contractId || !rejectReason.trim()) {
       setErrorMessage('Vui lòng nhập lý do yêu cầu sửa đổi hợp đồng');
       return;
     }
+    setErrorMessage(null);
+    setSuccessMessage(null);
     setIsSubmitting(true);
     try {
-      const res = await fetch(`/api/v1/contracts/${contract.id}/request-changes`, {
+      const res = await fetch(`/api/v1/contracts/${contractId}/request-changes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
           reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
-          reason: rejectReason.trim()
+          reason: rejectReason.trim(),
+          contractData: contract ? { ...contract, ...formData } : formData,
+          productData: activeProduct,
+          contractNumber: contract?.contractNumber || formData.maHopdong,
+          productId: activeProduct?.id
         })
       });
-      if (!res.ok) throw new Error('Yêu cầu chỉnh sửa thất bại');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Yêu cầu chỉnh sửa thất bại');
 
       setSuccessMessage('Đã gửi yêu cầu nhập lại thông tin cho Nhân viên kinh doanh.');
       setIsRejectPromptOpen(false);
@@ -271,7 +288,7 @@ export function ComprehensiveContractModal({
   };
 
   const isSalesAdmin = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER';
-  const isChangeRequested = contract?.status === 'CHANGE_REQUESTED';
+  const isChangeRequested = contract?.status === 'CHANGE_REQUESTED' || contract?.status === 'CHANGES_REQUESTED';
   const isApproved = contract?.status === 'SIGNED' || contract?.status === 'APPROVED' || contract?.signingStatus === 'DA_KY';
 
   return (

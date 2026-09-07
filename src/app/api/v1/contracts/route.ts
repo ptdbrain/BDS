@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { ensureProductExists } from '@/lib/productHelper';
 
 export async function GET() {
   try {
@@ -43,6 +44,7 @@ export async function POST(request: Request) {
       investorNotes,
       salesEmployeeId = 'emp_sales_01',
       salesEmployeeName = 'Trần Văn Nam',
+      productData,
       // Fields from ComprehensiveContractModal
       maHopdong,
       maKH,
@@ -60,14 +62,34 @@ export async function POST(request: Request) {
       status: requestedStatus
     } = body;
 
-    if (!productId) {
+    const effectiveProductId = productId || productData?.id || productData?.productCode;
+
+    if (!effectiveProductId) {
       return NextResponse.json({ error: 'Sản phẩm là bắt buộc' }, { status: 400 });
     }
 
-    const product = await db.product.findUnique({
-      where: { id: productId },
+    let product = await db.product.findUnique({
+      where: { id: effectiveProductId },
       include: { project: true, prices: true }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!product && productData) {
+      product = await ensureProductExists({ ...productData, id: effectiveProductId });
+    }
+
+    if (!product) {
+      product = await db.product.findFirst({
+        where: {
+          OR: [
+            { id: effectiveProductId },
+            { productCode: effectiveProductId },
+            { maCan: effectiveProductId }
+          ]
+        },
+        include: { project: true, prices: true }
+      });
+    }
 
     if (!product) {
       return NextResponse.json({ error: 'Không tìm thấy sản phẩm' }, { status: 400 });
@@ -127,7 +149,7 @@ export async function POST(request: Request) {
 
     // Check if contract exists for this product
     const existingContract = await db.contract.findFirst({
-      where: { productId }
+      where: { productId: product.id }
     });
 
     if (existingContract) {
@@ -235,7 +257,7 @@ export async function POST(request: Request) {
     const contract = await db.contract.create({
       data: {
         contractNumber,
-        productId,
+        productId: product.id,
         customerId: resolvedCustomerId,
         lockId,
         salesEmployeeId: validSalesId,

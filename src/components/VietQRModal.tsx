@@ -88,7 +88,8 @@ export function VietQRModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          notes: `Sales xác nhận khách hàng đã chuyển khoản cọc VietQR 100M cho căn ${productCode}`
+          notes: `Sales xác nhận khách hàng đã chuyển khoản cọc VietQR 100M cho căn ${productCode}`,
+          lockData: lock
         })
       });
 

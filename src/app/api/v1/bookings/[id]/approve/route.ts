@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureBookingExists } from '@/lib/bookingHelper';
 
 export async function PATCH(
   request: Request,
@@ -15,10 +16,32 @@ export async function PATCH(
       notes = 'Sales Admin xác nhận đã nhận thanh toán cọc Booking 50.000.000 VNĐ'
     } = body;
 
-    const booking = await db.booking.findUnique({
+    let booking = await db.booking.findUnique({
       where: { id: bookingId },
       include: { project: true, salesEmployee: true }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!booking && (body.bookingData || body.maLuotBooking)) {
+      booking = await ensureBookingExists({
+        id: bookingId,
+        ...body.bookingData,
+        maLuotBooking: body.maLuotBooking || body.bookingData?.maLuotBooking
+      });
+    }
+
+    if (!booking) {
+      booking = await db.booking.findFirst({
+        where: {
+          OR: [
+            { id: bookingId },
+            { maLuotBooking: bookingId },
+            ...(body.maLuotBooking ? [{ maLuotBooking: body.maLuotBooking }] : [])
+          ]
+        },
+        include: { project: true, salesEmployee: true }
+      });
+    }
 
     if (!booking) {
       return NextResponse.json({ error: 'Không tìm thấy lượt booking' }, { status: 404 });

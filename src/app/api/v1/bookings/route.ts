@@ -147,6 +147,28 @@ export async function POST(request: Request) {
       }
     });
 
+    // Auto-register Customer record into Customer table so it appears in Customer Management
+    if (customerPhone && customerName) {
+      try {
+        const existingCust = await db.customer.findFirst({ where: { phone: customerPhone } });
+        if (!existingCust) {
+          await db.customer.create({
+            data: {
+              fullName: customerName,
+              phone: customerPhone,
+              email: body.customerEmail || `${customerPhone}@gmail.com`,
+              cccdCiphertext: body.customerCccd ? `ENC_${body.customerCccd}` : 'ENC_00120000450',
+              cccdHash: body.customerCccd ? `HASH_${body.customerCccd}` : customerPhone,
+              addressCiphertext: body.customerAddress || 'Hà Nội',
+              verificationStatus: 'DRAFT'
+            }
+          });
+        }
+      } catch (custErr) {
+        console.warn('Could not auto-register Customer from booking:', custErr);
+      }
+    }
+
     return NextResponse.json({
       message: `Đăng ký Booking ${bookingCode} thành công!`,
       data: booking

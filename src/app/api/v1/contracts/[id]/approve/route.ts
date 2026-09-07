@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureContractExists } from '@/lib/contractHelper';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
   request: Request,
@@ -8,45 +10,57 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
-    const { reviewerId = 'NV007', reviewerName = 'Vũ Mai Phương (Sales Admin)', reason = 'Hồ sơ pháp lý, thông tin khách hàng & tiền cọc đầy đủ hợp lệ' } = body;
+    const {
+      reviewerId = 'NV007',
+      reviewerName = 'Vũ Mai Phương (Sales Admin)',
+      reason = 'Hồ sơ pháp lý, thông tin khách hàng & tiền cọc đầy đủ hợp lệ',
+      contractData,
+      productData,
+      contractNumber,
+      productId
+    } = body;
 
-    const contract = await db.contract.findUnique({
+    let contract = await db.contract.findUnique({
       where: { id: params.id },
       include: { product: true }
     });
 
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!contract && (contractData || productData || contractNumber || productId)) {
+      contract = await ensureContractExists({
+        ...contractData,
+        id: params.id,
+        contractNumber: contractNumber || contractData?.contractNumber,
+        productId: productId || contractData?.productId
+      }, productData);
+    }
+
     if (!contract) {
-      return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+      contract = await db.contract.findFirst({
+        where: {
+          OR: [
+            { id: params.id },
+            { contractNumber: params.id },
+            { maHopdong: params.id },
+            ...(contractNumber ? [{ contractNumber }, { maHopdong: contractNumber }] : [])
+          ]
+        },
+        include: { product: true }
+      });
     }
 
-    let validReviewerId = reviewerId;
-    const emp = await db.employee.findFirst({
-      where: {
-        OR: [
-          { id: reviewerId },
-          { employeeCode: reviewerId },
-          { maNV: reviewerId }
-        ]
-      }
-    }) || await db.employee.findFirst({
-      where: {
-        OR: [
-          { employeeCode: 'NV007' },
-          { maNV: 'NV007' }
-        ]
-      }
-    }) || await db.employee.findFirst();
-
-    if (emp) {
-      validReviewerId = emp.id;
+    if (!contract) {
+      return NextResponse.json({ error: 'Không tìm thấy hợp đồng' }, { status: 404 });
     }
+
+    const validReviewerId = await resolveEmployeeId(reviewerId, 'SALES_ADMIN');
 
     const now = new Date();
 
     await db.$transaction(async (tx) => {
       // Cập nhật hợp đồng sang APPROVED & SIGNED (Đã ký)
       await tx.contract.update({
-        where: { id: params.id },
+        where: { id: contract.id },
         data: {
           status: 'SIGNED',
           signingStatus: 'DA_KY',
@@ -73,7 +87,7 @@ export async function POST(
 
       await tx.contractReview.create({
         data: {
-          contractId: params.id,
+          contractId: contract.id,
           reviewerId: validReviewerId,
           decision: 'APPROVED',
           reason
@@ -86,7 +100,7 @@ export async function POST(
       actorName: reviewerName,
       action: 'APPROVE_CONTRACT',
       entityType: 'CONTRACT',
-      entityId: params.id,
+      entityId: contract.id,
       afterJson: {
         description: `Sales Admin (${reviewerName}) đã duyệt hợp đồng ${contract.contractNumber}. Ghi nhận doanh số và hoa hồng cho Sales.`,
         status: 'SIGNED',

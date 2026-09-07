@@ -21,14 +21,17 @@ import {
   Timer,
   User,
   Phone,
-  Check
+  Check,
+  PlusCircle
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
+import { BookingModal } from '@/components/BookingModal';
 
 interface LockManagerProps {
   locks: any[];
   bookings?: any[];
+  projects?: any[];
   onRefresh: () => void;
   onCancelLock: (lockId: string) => void;
   onProceedToCustomer: (lock: any) => void;
@@ -39,12 +42,14 @@ interface LockManagerProps {
 export function LockManager({
   locks,
   bookings = [],
+  projects = [],
   onRefresh,
   onCancelLock,
   onProceedToCustomer,
   currentRole = 'SALES',
   currentUser
 }: LockManagerProps) {
+  const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isConfirmingTransfer, setIsConfirmingTransfer] = useState<string | null>(null);
   const [isConfirmingPaymentSales, setIsConfirmingPaymentSales] = useState<boolean>(false);
   const [editingBooking, setEditingBooking] = useState<any | null>(null);
@@ -216,13 +221,15 @@ export function LockManager({
     setIsConfirmingTransfer(lockId);
     setActionSuccessMsg(null);
     try {
+      const lockObj = locks.find(l => l.id === lockId);
       const res = await fetch(`/api/v1/locks/${lockId}/confirm-transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actorId: 'emp_admin_01',
           actorName: 'Phạm Thị Mai',
-          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc hợp lệ từ ngân hàng'
+          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc hợp lệ từ ngân hàng',
+          lockData: lockObj
         })
       });
 
@@ -247,13 +254,16 @@ export function LockManager({
     setIsApprovingBooking(bookingId);
     setActionSuccessMsg(null);
     try {
+      const targetBooking = bookings.find((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
       const res = await fetch(`/api/v1/bookings/${bookingId}/approve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actorId: currentUser?.id || 'emp_sales_admin',
           actorName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
-          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc Booking 50.000.000 VNĐ hợp lệ'
+          notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc Booking 50.000.000 VNĐ hợp lệ',
+          bookingData: targetBooking,
+          maLuotBooking: targetBooking?.maLuotBooking
         })
       });
 
@@ -262,6 +272,24 @@ export function LockManager({
         alert(data.error || 'Xác nhận thanh toán cọc thất bại');
         return;
       }
+
+      // Update localStorage custom bookings if exists
+      try {
+        const stored = localStorage.getItem('ahs_custom_bookings');
+        if (stored) {
+          const customList = JSON.parse(stored);
+          const idx = customList.findIndex((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
+          if (idx >= 0) {
+            customList[idx] = {
+              ...customList[idx],
+              trangthaikhopcan: 'DANG_KHOP',
+              tgBatdaukhop: new Date(),
+              tgKetthuckhopcan: new Date(Date.now() + 10 * 60 * 1000)
+            };
+            localStorage.setItem('ahs_custom_bookings', JSON.stringify(customList));
+          }
+        }
+      } catch (e) {}
 
       setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Khung giờ khớp căn (10 phút) đã được kích hoạt cho Sales.');
       onRefresh();
@@ -332,6 +360,16 @@ export function LockManager({
         </div>
 
         <div className="flex items-center space-x-3">
+          {currentRole === 'SALES' && (
+            <button
+              onClick={() => setIsBookingModalOpen(true)}
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 hover:from-amber-400 hover:to-orange-400 text-xs font-black uppercase shadow-lg shadow-amber-500/20 transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ Đăng Ký Booking (50M)</span>
+            </button>
+          )}
+
           <button
             onClick={onRefresh}
             className="flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition"
@@ -1081,6 +1119,17 @@ export function LockManager({
         contract={contractModalData.contract}
         product={contractModalData.product}
         currentRole={currentRole}
+        currentUser={currentUser}
+        onSuccess={() => {
+          onRefresh();
+        }}
+      />
+
+      {/* REGISTER BOOKING MODAL */}
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        projects={projects}
         currentUser={currentUser}
         onSuccess={() => {
           onRefresh();

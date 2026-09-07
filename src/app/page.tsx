@@ -90,7 +90,34 @@ export default function Home() {
       const res = await fetch(`/api/v1/products?projectId=${selectedProjectId}`);
       const data = await res.json();
       if (data.data) {
-        setProducts(data.data);
+        let mergedProducts = [...data.data];
+
+        // Merge custom products from localStorage if this serverless container hasn't seen them yet
+        try {
+          const stored = localStorage.getItem('ahs_custom_products');
+          if (stored) {
+            const customProds = JSON.parse(stored);
+            if (Array.isArray(customProds)) {
+              for (const cp of customProds) {
+                if (cp.projectId === selectedProjectId) {
+                  const existingIdx = mergedProducts.findIndex(p => p.id === cp.id || p.productCode === cp.productCode);
+                  if (existingIdx >= 0) {
+                    if (cp.status && cp.status !== 'AVAILABLE') {
+                      mergedProducts[existingIdx].status = cp.status;
+                      mergedProducts[existingIdx].trangthai = cp.trangthai;
+                    }
+                  } else {
+                    mergedProducts.push(cp);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        setProducts(mergedProducts);
       }
     } catch (err) {
       console.error('Failed to fetch products', err);
@@ -115,7 +142,25 @@ export default function Home() {
     try {
       const res = await fetch('/api/v1/bookings');
       const data = await res.json();
-      if (data.data) setBookings(data.data);
+      let serverBookings: any[] = data.data || [];
+
+      // Reconcile with localStorage custom bookings for Vercel multi-container persistence
+      try {
+        const stored = localStorage.getItem('ahs_custom_bookings');
+        if (stored) {
+          const customList = JSON.parse(stored);
+          if (Array.isArray(customList)) {
+            const serverIds = new Set(serverBookings.map((b: any) => b.id || b.maLuotBooking));
+            customList.forEach((cb: any) => {
+              if (!serverIds.has(cb.id) && !serverIds.has(cb.maLuotBooking)) {
+                serverBookings.unshift(cb);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      setBookings(serverBookings);
     } catch (err) {
       console.error('Failed to fetch bookings', err);
     }
@@ -215,10 +260,12 @@ export default function Home() {
   }, [refreshAllData, currentUser]);
 
   // Action: Lock product 30m
-  const handleLockProduct = async (productId: string) => {
+  const handleLockProduct = async (productId: string, productData?: any) => {
     try {
       const salesId = currentUser?.id || 'c9c46059-fd48-4132-b1ad-5fe1d2f3a1ea';
       const salesName = currentUser?.fullName || 'Nguyễn Minh Khôi';
+
+      const targetProduct = productData || products.find(p => p.id === productId || p.productCode === productId);
 
       const res = await fetch('/api/v1/locks', {
         method: 'POST',
@@ -226,7 +273,8 @@ export default function Home() {
         body: JSON.stringify({
           productId,
           salesEmployeeId: salesId,
-          salesEmployeeName: salesName
+          salesEmployeeName: salesName,
+          productData: targetProduct
         })
       });
 
@@ -236,8 +284,23 @@ export default function Home() {
         return;
       }
 
+      // Update custom product status in localStorage if applicable
+      try {
+        const stored = localStorage.getItem('ahs_custom_products');
+        if (stored) {
+          const list = JSON.parse(stored);
+          const item = list.find((p: any) => p.id === productId || p.productCode === targetProduct?.productCode);
+          if (item) {
+            item.status = 'LOCKED';
+            item.trangthai = 'Đang giữ chỗ';
+            localStorage.setItem('ahs_custom_products', JSON.stringify(list));
+          }
+        }
+      } catch (e) {}
+
       refreshAllData();
       broadcastSync('LOCK_UPDATED');
+      broadcastSync('PRODUCT_UPDATED');
       setActiveLockModal(data.data?.lock || data.data);
     } catch (err: any) {
       alert(err.message);
@@ -405,6 +468,7 @@ export default function Home() {
             <LockManager
               locks={locks}
               bookings={bookings}
+              projects={projects}
               onRefresh={refreshAllData}
               onCancelLock={handleCancelLock}
               onProceedToCustomer={handleProceedToCustomer}

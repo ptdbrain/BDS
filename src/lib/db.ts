@@ -7,6 +7,11 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function initVercelDatabase() {
+  // If a central cloud database URL is configured, use it directly
+  if (process.env.DATABASE_URL && !process.env.DATABASE_URL.startsWith('file:')) {
+    return process.env.DATABASE_URL;
+  }
+
   if (!process.env.VERCEL) {
     return process.env.DATABASE_URL || 'file:./dev.db';
   }

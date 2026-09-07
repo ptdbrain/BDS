@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { ensureContractExists } from '@/lib/contractHelper';
 
 export async function GET(
   request: Request,
@@ -65,10 +66,34 @@ export async function PATCH(
       actorName = 'Nhân viên kinh doanh'
     } = body;
 
-    const existing = await db.contract.findUnique({
+    let existing = await db.contract.findUnique({
       where: { id: params.id },
       include: { customer: true }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!existing && (body.productData || body.productId || body.maHopdong || body.contractNumber)) {
+      existing = await ensureContractExists({
+        ...body,
+        id: params.id,
+        contractNumber: body.contractNumber || body.maHopdong
+      }, body.productData);
+    }
+
+    if (!existing) {
+      existing = await db.contract.findFirst({
+        where: {
+          OR: [
+            { id: params.id },
+            { contractNumber: params.id },
+            { maHopdong: params.id },
+            ...(body.maHopdong ? [{ maHopdong: body.maHopdong }, { contractNumber: body.maHopdong }] : []),
+            ...(body.contractNumber ? [{ contractNumber: body.contractNumber }, { maHopdong: body.contractNumber }] : [])
+          ]
+        },
+        include: { customer: true }
+      });
+    }
 
     if (!existing) {
       return NextResponse.json({ error: 'Không tìm thấy hợp đồng' }, { status: 404 });
@@ -188,7 +213,7 @@ export async function PATCH(
     }
 
     const updated = await db.contract.update({
-      where: { id: params.id },
+      where: { id: existing.id },
       data: dataToUpdate,
       include: {
         product: { include: { project: true } },
@@ -214,7 +239,7 @@ export async function PATCH(
       actorName,
       action: 'UPDATE_CONTRACT_INFO',
       entityType: 'CONTRACT',
-      entityId: params.id,
+      entityId: existing.id,
       afterJson: dataToUpdate
     });
 

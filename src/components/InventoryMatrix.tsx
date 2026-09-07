@@ -34,6 +34,7 @@ import {
 import { ProjectInfoView } from '@/components/ProjectInfoView';
 import { AddProductModal } from '@/components/AddProductModal';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
+import { BookingModal } from '@/components/BookingModal';
 import { broadcastSync, onSync } from '@/lib/sync';
 
 interface InventoryMatrixProps {
@@ -44,7 +45,7 @@ interface InventoryMatrixProps {
   contracts?: any[];
   selectedProjectId: string;
   onSelectProject: (id: string) => void;
-  onLockProduct: (productId: string) => void;
+  onLockProduct: (productId: string, productData?: any) => void;
   onOpenImportModal: () => void;
   onRefresh: () => void;
   isLoading: boolean;
@@ -86,17 +87,8 @@ export function InventoryMatrix({
   const [bookings, setBookings] = useState<any[]>([]);
   const [isLoadingBookings, setIsLoadingBookings] = useState<boolean>(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState<boolean>(false);
-  const [bookingModalStep, setBookingModalStep] = useState<'INPUT' | 'QR'>('INPUT');
-  const [bookingFormData, setBookingFormData] = useState({
-    customerName: 'Nguyễn Tuấn Anh',
-    customerPhone: '0912345678',
-    depositAmount: '50000000',
-    notes: 'Nguyện vọng căn 2PN tầng trung ban công Đông Nam'
-  });
   const [editingBooking, setEditingBooking] = useState<any | null>(null);
   const [isSavingBookingEdit, setIsSavingBookingEdit] = useState<boolean>(false);
-  const [bookingError, setBookingError] = useState<string | null>(null);
-  const [isSubmittingBooking, setIsSubmittingBooking] = useState<boolean>(false);
   const [isApprovingBooking, setIsApprovingBooking] = useState<string | null>(null);
   const [matchingLoadingUnitId, setMatchingLoadingUnitId] = useState<string | null>(null);
   const [nowTime, setNowTime] = useState<number>(Date.now());
@@ -111,14 +103,36 @@ export function InventoryMatrix({
   const isProjectUnreleased = selectedProject?.status === 'UPCOMING';
 
   const fetchBookings = async () => {
-    if (!selectedProjectId) return;
     setIsLoadingBookings(true);
     try {
-      const res = await fetch(`/api/v1/bookings?projectId=${selectedProjectId}`);
+      const url = selectedProjectId ? `/api/v1/bookings?projectId=${selectedProjectId}` : '/api/v1/bookings';
+      const res = await fetch(url);
+      let serverBookings: any[] = [];
       if (res.ok) {
         const data = await res.json();
-        setBookings(data.data || []);
+        serverBookings = data.data || [];
       }
+
+      // Reconcile with localStorage custom bookings for Vercel multi-container persistence
+      try {
+        const stored = localStorage.getItem('ahs_custom_bookings');
+        if (stored) {
+          const customList = JSON.parse(stored);
+          if (Array.isArray(customList)) {
+            const filteredCustom = selectedProjectId
+              ? customList.filter((cb: any) => cb.projectId === selectedProjectId || !cb.projectId)
+              : customList;
+            const serverIds = new Set(serverBookings.map((b: any) => b.id || b.maLuotBooking));
+            filteredCustom.forEach((cb: any) => {
+              if (!serverIds.has(cb.id) && !serverIds.has(cb.maLuotBooking)) {
+                serverBookings.unshift(cb);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      setBookings(serverBookings);
     } catch (err) {
       console.error('Error fetching bookings:', err);
     } finally {
@@ -146,71 +160,6 @@ export function InventoryMatrix({
     });
     return cleanup;
   }, [selectedProjectId]);
-
-  // Handle Sales step 1 -> proceed to QR code
-  const handleProceedToBookingQR = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!bookingFormData.customerName.trim() || !bookingFormData.customerPhone.trim()) {
-      setBookingError('Vui lòng nhập họ tên và số điện thoại khách hàng!');
-      return;
-    }
-    setBookingError(null);
-    setBookingModalStep('QR');
-  };
-
-  // Handle Sales confirms payment of 50M -> status becomes CHO_DUYET_COC
-  const handleConfirmBookingPayment = async () => {
-    setIsSubmittingBooking(true);
-    setBookingError(null);
-    try {
-      let currentSalesId = currentUser?.id || 'NV001';
-      try {
-        const authUser = localStorage.getItem('ahs_auth_user');
-        if (authUser) {
-          const parsed = JSON.parse(authUser);
-          if (parsed.id || parsed.employeeCode) {
-            currentSalesId = parsed.id || parsed.employeeCode;
-          }
-        }
-      } catch (e) {}
-
-      const res = await fetch('/api/v1/bookings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: selectedProjectId,
-          customerName: bookingFormData.customerName,
-          customerPhone: bookingFormData.customerPhone,
-          depositAmount: parseFloat(bookingFormData.depositAmount || '50000000'),
-          notes: bookingFormData.notes,
-          salesEmployeeId: currentSalesId,
-          trangthaikhopcan: 'CHO_DUYET_COC' // Chờ Sales Admin xác nhận thanh toán
-        })
-      });
-
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Đăng ký booking thất bại');
-      }
-
-      setIsBookingModalOpen(false);
-      setBookingModalStep('INPUT');
-      setBookingFormData({
-        customerName: '',
-        customerPhone: '',
-        depositAmount: '50000000',
-        notes: 'Nguyện vọng căn 2PN tầng trung ban công Đông Nam'
-      });
-      await fetchBookings();
-      onRefresh();
-      broadcastSync('BOOKING_UPDATED');
-      alert('Đã gửi thông tin chuyển khoản cọc 50.000.000 VNĐ! Lượt booking đang ở trạng thái [Chờ Duyệt Cọc], chờ Sales Admin xác nhận thanh toán.');
-    } catch (err: any) {
-      setBookingError(err.message);
-    } finally {
-      setIsSubmittingBooking(false);
-    }
-  };
 
   // Handle Sales updating booking information (customer name, phone, notes)
   const handleUpdateBookingInfo = async (e: React.FormEvent) => {
@@ -248,13 +197,16 @@ export function InventoryMatrix({
   const handleApproveBooking = async (bookingId: string) => {
     setIsApprovingBooking(bookingId);
     try {
+      const targetBooking = bookings.find((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
       const res = await fetch(`/api/v1/bookings/${bookingId}/approve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actorId: currentUser?.id || 'emp_sales_admin',
           actorName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
-          notes: 'Sales Admin xác nhận đã nhận cọc VietQR 50.000.000 VNĐ hợp lệ'
+          notes: 'Sales Admin xác nhận đã nhận cọc VietQR 50.000.000 VNĐ hợp lệ',
+          bookingData: targetBooking,
+          maLuotBooking: targetBooking?.maLuotBooking
         })
       });
 
@@ -263,6 +215,24 @@ export function InventoryMatrix({
         alert(data.error || 'Duyệt thanh toán cọc thất bại');
         return;
       }
+
+      // Update localStorage custom bookings
+      try {
+        const stored = localStorage.getItem('ahs_custom_bookings');
+        if (stored) {
+          const customList = JSON.parse(stored);
+          const idx = customList.findIndex((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
+          if (idx >= 0) {
+            customList[idx] = {
+              ...customList[idx],
+              trangthaikhopcan: 'DANG_KHOP',
+              tgBatdaukhop: new Date(),
+              tgKetthuckhopcan: new Date(Date.now() + 10 * 60 * 1000)
+            };
+            localStorage.setItem('ahs_custom_bookings', JSON.stringify(customList));
+          }
+        }
+      } catch (e) {}
 
       await fetchBookings();
       onRefresh();
@@ -279,13 +249,17 @@ export function InventoryMatrix({
   const handleMatchUnit = async (product: any, bookingId: string) => {
     setMatchingLoadingUnitId(product.id);
     try {
+      const targetBooking = bookings.find((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
       const res = await fetch(`/api/v1/bookings/${bookingId}/match-unit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: product.id,
           salesEmployeeId: currentUser?.id || 'NV001',
-          salesEmployeeName: currentUser?.fullName || 'Trần Văn Nam (Sales)'
+          salesEmployeeName: currentUser?.fullName || 'Trần Văn Nam (Sales)',
+          productData: product,
+          bookingData: targetBooking,
+          maLuotBooking: targetBooking?.maLuotBooking
         })
       });
 
@@ -628,18 +602,25 @@ export function InventoryMatrix({
           </div>
 
           {/* Booking KPI Summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="glass-panel p-4 rounded-xl border border-slate-800">
               <span className="text-[11px] text-slate-400 font-semibold uppercase">Tổng Số Lượt Booking</span>
               <div className="text-2xl font-black text-white mt-1">{bookings.length}</div>
               <span className="text-[10px] text-slate-500">Toàn bộ khách hàng đặt chỗ</span>
             </div>
-            <div className="glass-panel p-4 rounded-xl border border-amber-500/30 bg-amber-950/10">
-              <span className="text-[11px] text-amber-400 font-semibold uppercase">Đang Chờ Khớp Căn</span>
+            <div className="glass-panel p-4 rounded-xl border border-amber-500/40 bg-amber-950/20">
+              <span className="text-[11px] text-amber-400 font-semibold uppercase">Chờ Admin Duyệt Cọc</span>
               <div className="text-2xl font-black text-amber-400 mt-1">
+                {bookings.filter(b => b.trangthaikhopcan === 'CHO_DUYET_COC').length}
+              </div>
+              <span className="text-[10px] text-amber-400/70">Đang chờ xác nhận VietQR 50M</span>
+            </div>
+            <div className="glass-panel p-4 rounded-xl border border-blue-500/30 bg-blue-950/10">
+              <span className="text-[11px] text-blue-400 font-semibold uppercase">Đang Chờ Khớp Căn</span>
+              <div className="text-2xl font-black text-blue-400 mt-1">
                 {bookings.filter(b => b.trangthaikhopcan === 'CHO_KHOP' || b.trangthaikhopcan === 'Chưa khớp').length}
               </div>
-              <span className="text-[10px] text-amber-400/70">Ưu tiên theo số thứ tự STTBooking</span>
+              <span className="text-[10px] text-blue-400/70">Ưu tiên theo số thứ tự STTBooking</span>
             </div>
             <div className="glass-panel p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/10">
               <span className="text-[11px] text-emerald-400 font-semibold uppercase">Đã Khớp Căn Thành Công</span>
@@ -1013,7 +994,7 @@ export function InventoryMatrix({
                                           );
                                           if (!proceed) return;
                                         }
-                                        onLockProduct(prod.id);
+                                        onLockProduct(prod.id, prod);
                                       }}
                                       className="w-full mt-2 py-1.5 px-2 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[11px] uppercase flex items-center justify-center space-x-1 shadow-md hover:from-amber-400 hover:to-orange-400 transition"
                                     >
@@ -1025,17 +1006,17 @@ export function InventoryMatrix({
 
                                 {/* If unit is SOLD: show button to open Comprehensive Contract Modal */}
                                 {isSold && (() => {
-                                  const existingContract = contracts.find((c: any) => c.productId === prod.id);
+                                  const existingContract = contracts.find((c: any) => c.productId === prod.id || c.product?.productCode === prod.productCode || c.contractNumber?.includes(prod.productCode) || c.maHopdong?.includes(prod.productCode));
                                   const st = existingContract?.status;
                                   let btnText = '📝 Nhập TT Hợp Đồng';
                                   let btnBg = 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white';
                                   if (st === 'PENDING_REVIEW') {
                                     btnText = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? '🔎 Duyệt Hợp Đồng' : '⏳ Chờ Admin Duyệt';
                                     btnBg = 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black animate-pulse';
-                                  } else if (st === 'CHANGES_REQUESTED') {
+                                  } else if (st === 'CHANGE_REQUESTED' || st === 'CHANGES_REQUESTED') {
                                     btnText = '⚠️ Yêu Cầu Nhập Lại';
                                     btnBg = 'bg-gradient-to-r from-rose-600 to-red-600 text-white font-black';
-                                  } else if (st === 'SIGNED') {
+                                  } else if (st === 'SIGNED' || st === 'APPROVED') {
                                     btnText = '✓ HĐ Đã Phê Duyệt';
                                     btnBg = 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-bold';
                                   }
@@ -1122,7 +1103,7 @@ export function InventoryMatrix({
                                     );
                                     if (!proceed) return;
                                   }
-                                  onLockProduct(prod.id);
+                                  onLockProduct(prod.id, prod);
                                 }}
                                 className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[11px] uppercase transition shadow-md hover:from-amber-400 hover:to-orange-400"
                               >
@@ -1132,17 +1113,17 @@ export function InventoryMatrix({
                           )}
 
                           {isSold && (() => {
-                            const existingContract = contracts.find((c: any) => c.productId === prod.id);
+                            const existingContract = contracts.find((c: any) => c.productId === prod.id || c.product?.productCode === prod.productCode || c.contractNumber?.includes(prod.productCode) || c.maHopdong?.includes(prod.productCode));
                             const st = existingContract?.status;
                             let btnText = '📝 Nhập TT HĐ';
                             let btnBg = 'bg-purple-600 hover:bg-purple-500 text-white';
                             if (st === 'PENDING_REVIEW') {
                               btnText = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? '🔎 Duyệt HĐ' : '⏳ Chờ Admin Duyệt';
                               btnBg = 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black animate-pulse';
-                            } else if (st === 'CHANGES_REQUESTED') {
+                            } else if (st === 'CHANGE_REQUESTED' || st === 'CHANGES_REQUESTED') {
                               btnText = '⚠️ Nhập Lại HĐ';
                               btnBg = 'bg-rose-600 hover:bg-rose-500 text-white font-bold';
-                            } else if (st === 'SIGNED') {
+                            } else if (st === 'SIGNED' || st === 'APPROVED') {
                               btnText = '✓ HĐ Đã Duyệt';
                               btnBg = 'bg-emerald-600 hover:bg-emerald-500 text-white font-bold';
                             }
@@ -1319,9 +1300,9 @@ export function InventoryMatrix({
                 ) : (
                   <button
                     onClick={() => {
-                      const pid = selectedProduct.id;
+                      const prod = selectedProduct;
                       setSelectedProduct(null);
-                      onLockProduct(pid);
+                      onLockProduct(prod.id, prod);
                     }}
                     className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black uppercase flex items-center space-x-2 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
                   >
@@ -1336,7 +1317,7 @@ export function InventoryMatrix({
                   onClick={() => {
                     const prod = selectedProduct;
                     setSelectedProduct(null);
-                    const existingContract = contracts.find((c: any) => c.productId === prod.id);
+                    const existingContract = contracts.find((c: any) => c.productId === prod.id || c.product?.productCode === prod.productCode || c.contractNumber?.includes(prod.productCode) || c.maHopdong?.includes(prod.productCode));
                     setContractModalData({
                       isOpen: true,
                       contract: existingContract || null,
@@ -1365,149 +1346,20 @@ export function InventoryMatrix({
         }}
       />
 
-      {/* REGISTER BOOKING MODAL (WORKFLOW 1: NHẤN THÊM BOOKING => HIỂN THỊ QR => SALES XÁC NHẬN THANH TOÁN) */}
-      {isBookingModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
-          <div className="glass-panel w-full max-w-lg rounded-2xl border border-slate-700 shadow-2xl p-6 space-y-4 max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center space-x-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40">
-                  <QrCode className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white">
-                    Quét Mã VietQR Thanh Toán Cọc Booking
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Dự án: {selectedProject?.name} • Cọc giữ chỗ ưu tiên 50.000.000 VNĐ
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsBookingModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {bookingError && (
-              <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/50 text-rose-300 text-xs">
-                {bookingError}
-              </div>
-            )}
-
-            <div className="p-3 rounded-xl bg-amber-950/30 border border-amber-500/40 text-xs text-amber-300 flex items-center space-x-2">
-              <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                Quét mã VietQR chuyển khoản <strong>50.000.000 VNĐ</strong>. Sau đó nhấn xác nhận bên dưới để gửi Sales Admin duyệt cọc.
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-              {/* VietQR Code Image */}
-              <div className="bg-white p-3 rounded-2xl shadow-xl flex flex-col items-center justify-center border-2 border-amber-500">
-                <img
-                  src={`https://img.vietqr.io/image/TCB-19036868689999-compact2.png?amount=50000000&addInfo=${encodeURIComponent(`AHS BOOKING ${bookingFormData.customerPhone || '0912345678'}`)}&accountName=${encodeURIComponent('CONG TY CO PHAN BAT DONG SAN AHS')}`}
-                  alt="VietQR Booking Deposit"
-                  className="w-44 h-44 object-contain"
-                />
-                <div className="text-[10px] text-slate-700 font-bold mt-1 text-center">
-                  VietQR • Techcombank 50M
-                </div>
-              </div>
-
-              {/* Transfer Details */}
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase block">Số Tài Khoản Thụ Hưởng</span>
-                  <span className="font-mono font-black text-amber-400 text-sm block">19036868689999</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase block">Chủ Tài Khoản</span>
-                  <span className="font-bold text-slate-200 block">CTCP BAT DONG SAN AHS</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase block">Ngân Hàng</span>
-                  <span className="font-bold text-slate-200 block">Techcombank</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase block">Số Tiền Cọc Booking</span>
-                  <span className="font-mono font-black text-emerald-400 text-sm block">50.000.000 VND</span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] text-slate-400 uppercase block">Nội Dung Chuyển Khoản</span>
-                  <span className="font-mono font-bold text-amber-300 block">AHS BOOKING {bookingFormData.customerPhone || '0912345678'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Thông tin khách hàng của lượt booking */}
-            <div className="space-y-2.5 pt-3 border-t border-slate-800 text-xs">
-              <div className="text-slate-300 font-bold flex items-center space-x-1.5">
-                <User className="w-4 h-4 text-amber-400" />
-                <span>Thông Tin Khách Hàng (Có thể chỉnh sửa sau khi Admin duyệt)</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Họ Tên Khách Hàng (*)</label>
-                  <input
-                    type="text"
-                    required
-                    value={bookingFormData.customerName}
-                    onChange={(e) => setBookingFormData({ ...bookingFormData, customerName: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 text-white px-2.5 py-1.5 rounded-lg outline-none focus:border-amber-500 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Số Điện Thoại (*)</label>
-                  <input
-                    type="tel"
-                    required
-                    value={bookingFormData.customerPhone}
-                    onChange={(e) => setBookingFormData({ ...bookingFormData, customerPhone: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-700 text-white px-2.5 py-1.5 rounded-lg outline-none focus:border-amber-500 font-mono font-bold text-xs"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Nguyện Vọng Căn</label>
-                <input
-                  type="text"
-                  value={bookingFormData.notes}
-                  onChange={(e) => setBookingFormData({ ...bookingFormData, notes: e.target.value })}
-                  placeholder="VD: Căn góc ban công Đông Nam"
-                  className="w-full bg-slate-900 border border-slate-700 text-white px-2.5 py-1.5 rounded-lg outline-none focus:border-amber-500 text-xs"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
-              <button
-                type="button"
-                onClick={() => setIsBookingModalOpen(false)}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-slate-300 hover:text-white text-xs"
-              >
-                Đóng
-              </button>
-
-              <button
-                type="button"
-                disabled={isSubmittingBooking}
-                onClick={handleConfirmBookingPayment}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center space-x-2 shadow-lg shadow-emerald-500/20 transition"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>{isSubmittingBooking ? 'Đang gửi...' : 'Nhân Viên KD Xác Nhận Đã Thanh Toán'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* REGISTER BOOKING MODAL (2-STEP WORKFLOW: BẢNG NHẬP KHÁCH HÀNG => VIETQR THANH TOÁN) */}
+      <BookingModal
+        isOpen={isBookingModalOpen}
+        onClose={() => setIsBookingModalOpen(false)}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        currentUser={currentUser}
+        onSuccess={(newBooking) => {
+          setProjectSubTab('booking');
+          setBookings(prev => [newBooking, ...prev.filter((b: any) => b.id !== newBooking.id && b.maLuotBooking !== newBooking.maLuotBooking)]);
+          fetchBookings();
+          onRefresh();
+        }}
+      />
 
       {/* EDIT BOOKING MODAL (NHÂN VIÊN KD NHẬP / SỬA THÔNG TIN LƯỢT BOOKING) */}
       {editingBooking && (

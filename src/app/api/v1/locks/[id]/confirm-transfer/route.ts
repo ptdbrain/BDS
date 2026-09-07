@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureProductExists } from '@/lib/productHelper';
 
 export async function POST(
   request: Request,
@@ -11,16 +12,64 @@ export async function POST(
     const {
       actorId = 'emp_admin_01',
       actorName = 'Phạm Thị Mai',
-      notes = 'Sales Admin xác nhận đã nhận tiền chuyển khoản cọc thành công'
+      notes = 'Sales Admin xác nhận đã nhận tiền chuyển khoản cọc thành công',
+      lockData
     } = body;
 
-    const lock = await db.productLock.findUnique({
+    let lock = await db.productLock.findUnique({
       where: { id: params.id },
       include: {
         product: { include: { prices: true } },
         payments: true
       }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!lock && lockData) {
+      try {
+        const prod = await ensureProductExists(lockData.product || { id: lockData.productId });
+        if (prod) {
+          const defaultEmp = await db.employee.findFirst({ where: { employeeCode: 'NV001' } }) || await db.employee.findFirst();
+          const validSalesId = lockData.salesEmployeeId || defaultEmp?.id || 'emp_sales_01';
+          const depositAmount = prod.prices[0]?.depositAmount || 100000000;
+
+          await db.productLock.create({
+            data: {
+              id: params.id,
+              productId: prod.id,
+              salesEmployeeId: validSalesId,
+              status: 'PAYMENT_PENDING',
+              startedAt: new Date(Date.now() - 60000),
+              expiresAt: new Date(Date.now() + 29 * 60000),
+              idempotencyKey: `healed-lock-${params.id}`
+            }
+          });
+
+          await db.paymentTransaction.create({
+            data: {
+              lockId: params.id,
+              provider: 'VIETQR_AHS',
+              providerReference: `AHS-${prod.productCode.replace('-', '')}-${Date.now().toString().slice(-5)}`,
+              amount: depositAmount,
+              currency: 'VND',
+              status: 'REVIEW_REQUIRED',
+              expiresAt: new Date(Date.now() + 29 * 60000),
+              qrPayload: 'VIETQR_PAYLOAD'
+            }
+          });
+
+          lock = await db.productLock.findUnique({
+            where: { id: params.id },
+            include: {
+              product: { include: { prices: true } },
+              payments: true
+            }
+          });
+        }
+      } catch (healErr) {
+        console.error('[confirm-transfer] Self-healing lock failed:', healErr);
+      }
+    }
 
     if (!lock) {
       return NextResponse.json({

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { ensureProductExists } from '@/lib/productHelper';
+import { ensureBookingExists } from '@/lib/bookingHelper';
 
 export async function POST(
   request: Request,
@@ -9,26 +11,68 @@ export async function POST(
   try {
     const bookingId = params.id;
     const body = await request.json();
-    const { productId, salesEmployeeId, salesEmployeeName = 'Nguyễn Minh Khôi (Sales)' } = body;
+    const { productId, salesEmployeeId, salesEmployeeName = 'Nguyễn Minh Khôi (Sales)', productData } = body;
 
-    if (!productId) {
+    const effectiveProductId = productId || productData?.id || productData?.productCode;
+
+    if (!effectiveProductId) {
       return NextResponse.json({ error: 'productId là bắt buộc' }, { status: 400 });
     }
 
-    const booking = await db.booking.findUnique({
+    let booking = await db.booking.findUnique({
       where: { id: bookingId },
       include: { project: true, salesEmployee: true }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!booking && (body.bookingData || body.maLuotBooking)) {
+      booking = await ensureBookingExists({
+        id: bookingId,
+        ...body.bookingData,
+        maLuotBooking: body.maLuotBooking || body.bookingData?.maLuotBooking
+      });
+    }
+
+    if (!booking) {
+      booking = await db.booking.findFirst({
+        where: {
+          OR: [
+            { id: bookingId },
+            { maLuotBooking: bookingId },
+            ...(body.maLuotBooking ? [{ maLuotBooking: body.maLuotBooking }] : [])
+          ]
+        },
+        include: { project: true, salesEmployee: true }
+      });
+    }
 
     if (!booking) {
       return NextResponse.json({ error: 'Không tìm thấy lượt booking' }, { status: 404 });
     }
 
     // Kiểm tra căn hộ
-    const product = await db.product.findUnique({
-      where: { id: productId },
+    let product = await db.product.findUnique({
+      where: { id: effectiveProductId },
       include: { prices: true, project: true }
     });
+
+    // Self-healing for Vercel multi-container serverless SQLite
+    if (!product && productData) {
+      product = await ensureProductExists({ ...productData, id: effectiveProductId });
+    }
+
+    if (!product) {
+      product = await db.product.findFirst({
+        where: {
+          OR: [
+            { id: effectiveProductId },
+            { productCode: effectiveProductId },
+            { maCan: effectiveProductId }
+          ]
+        },
+        include: { prices: true, project: true }
+      });
+    }
 
     if (!product) {
       return NextResponse.json({ error: 'Không tìm thấy căn hộ' }, { status: 404 });
@@ -47,7 +91,7 @@ export async function POST(
     const result = await db.$transaction(async (tx) => {
       // 1. Cập nhật căn hộ sang ĐÃ BÁN (SOLD) - Không cần QR vì cọc booking 50M đã nộp
       const updatedProduct = await tx.product.update({
-        where: { id: productId },
+        where: { id: product.id },
         data: {
           status: 'SOLD',
           trangthai: 'Đã bán',
