@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureProductExists } from '@/lib/productHelper';
 import { ensureBookingExists } from '@/lib/bookingHelper';
+import { canSalesActOnBooking } from '@/lib/rolePolicy';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
   request: Request,
@@ -11,7 +13,13 @@ export async function POST(
   try {
     const bookingId = params.id;
     const body = await request.json();
-    const { productId, salesEmployeeId, salesEmployeeName = 'Nguyễn Minh Khôi (Sales)', productData } = body;
+    const {
+      productId,
+      salesEmployeeId,
+      salesEmployeeName = 'Nguyễn Minh Khôi (Sales)',
+      productData
+    } = body;
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
 
     const effectiveProductId = productId || productData?.id || productData?.productCode;
 
@@ -50,6 +58,15 @@ export async function POST(
       return NextResponse.json({ error: 'Không tìm thấy lượt booking' }, { status: 404 });
     }
 
+    const resolvedSalesId = salesEmployeeId
+      ? await resolveEmployeeId(salesEmployeeId, 'SALES')
+      : '';
+    if (!canSalesActOnBooking(actorRole, resolvedSalesId, booking.salesEmployeeId)) {
+      return NextResponse.json({
+        error: 'Chỉ nhân viên kinh doanh được phân công cho lượt Booking mới được khớp căn.'
+      }, { status: 403 });
+    }
+
     if (!booking.depositConfirmedAt) {
       return NextResponse.json({
         error: 'Giao dịch booking chưa được Sales Admin xác nhận. Chưa được phép khớp căn.'
@@ -60,15 +77,13 @@ export async function POST(
 
     // Kiểm tra quy tắc nghiệp vụ: Tất cả booking phải chờ thời điểm ra hàng của dự án
     // STT 1: từ thời điểm ra hàng (VD: 14h00) đến 14h10, STT 2: 14h10 đến 14h20, ...
-    if (!body.skipTimeCheck) {
-      if (booking.tgBatdaukhop && now.getTime() < new Date(booking.tgBatdaukhop).getTime()) {
-        const startH = String(new Date(booking.tgBatdaukhop).getHours()).padStart(2, '0');
-        const startM = String(new Date(booking.tgBatdaukhop).getMinutes()).padStart(2, '0');
-        const dayStr = `${String(new Date(booking.tgBatdaukhop).getDate()).padStart(2, '0')}/${String(new Date(booking.tgBatdaukhop).getMonth() + 1).padStart(2, '0')}`;
-        return NextResponse.json({
-          error: `Chưa tới thời điểm ra hàng hoặc chưa tới lượt khớp căn của Booking ${booking.maLuotBooking}! Khung giờ khớp căn: ${startH}h${startM} ngày ${dayStr}. Tất cả các lượt booking đều phải chờ đến giờ ra hàng!`
-        }, { status: 400 });
-      }
+    if (booking.tgBatdaukhop && now.getTime() < new Date(booking.tgBatdaukhop).getTime()) {
+      const startH = String(new Date(booking.tgBatdaukhop).getHours()).padStart(2, '0');
+      const startM = String(new Date(booking.tgBatdaukhop).getMinutes()).padStart(2, '0');
+      const dayStr = `${String(new Date(booking.tgBatdaukhop).getDate()).padStart(2, '0')}/${String(new Date(booking.tgBatdaukhop).getMonth() + 1).padStart(2, '0')}`;
+      return NextResponse.json({
+        error: `Chưa tới thời điểm ra hàng hoặc chưa tới lượt khớp căn của Booking ${booking.maLuotBooking}! Khung giờ khớp căn: ${startH}h${startM} ngày ${dayStr}. Tất cả các lượt booking đều phải chờ đến giờ ra hàng!`
+      }, { status: 400 });
     }
 
     // Kiểm tra căn hộ
@@ -105,8 +120,6 @@ export async function POST(
       }, { status: 409 });
     }
 
-    const resolvedSalesId = salesEmployeeId || booking.salesEmployeeId;
-
     // Thực hiện atomic transaction: Đổi trạng thái căn sang ĐÃ BÁN, Booking sang ĐÃ KHỚP, tạo Hợp Đồng nháp
     const result = await db.$transaction(async (tx) => {
       // 1. Cập nhật căn hộ sang ĐÃ BÁN (SOLD) - Không cần QR vì cọc booking 50M đã nộp
@@ -142,7 +155,7 @@ export async function POST(
             cccdCiphertext: 'ENC_CCCD_' + booking.maLuotBooking,
             cccdHash: 'HASH_' + booking.maLuotBooking,
             addressCiphertext: 'Hà Nội, Việt Nam',
-            verificationStatus: 'VERIFIED'
+            verificationStatus: 'DRAFT'
           }
         });
       }
@@ -166,8 +179,8 @@ export async function POST(
           dealRevenue: basePrice,
           status: 'DRAFT', // Chờ Sales điền đầy đủ và gửi duyệt
           signingStatus: 'CHUA_KY',
-        commissionStatus: null,
-        commissionAmount: null,
+          commissionStatus: null,
+          commissionAmount: null,
           investorContractNo: contractNumber,
           investorNotes: `Hợp đồng khớp căn từ lượt Booking ${booking.maLuotBooking}`,
           // Class diagram fields

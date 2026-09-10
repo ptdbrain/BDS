@@ -10,14 +10,12 @@ import {
   AlertTriangle,
   Clock,
   Sparkles,
-  Download,
   Send,
   X,
   RotateCcw,
   Check
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
-import jsPDF from 'jspdf';
 
 interface ComprehensiveContractModalProps {
   isOpen: boolean;
@@ -264,6 +262,7 @@ export function ComprehensiveContractModal({
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
           reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          actorRole: currentRole,
           reason: rejectReason.trim(),
           contractData: contract ? { ...contract, ...formData } : formData,
           productData: activeProduct,
@@ -288,41 +287,6 @@ export function ComprehensiveContractModal({
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // Export PDF
-  const handleExportPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(16);
-    doc.setTextColor(30, 58, 138);
-    doc.text('HO SO HOP DONG GIAO DICH BAT DONG SAN AHS PROPERTY', 20, 20);
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Ma Hop Dong: ${formData.maHopdong}`, 20, 30);
-    doc.text(`Ngay xuat: ${new Date().toLocaleDateString('vi-VN')}`, 20, 36);
-
-    doc.setFontSize(12);
-    doc.setTextColor(0, 0, 0);
-    doc.text('1. THONG TIN SAN PHAM [SanPham]:', 20, 48);
-    doc.setFontSize(10);
-    doc.text(`- Ma Can: ${activeProduct?.productCode || activeProduct?.maCan}`, 25, 56);
-    doc.text(`- Toa: ${activeProduct?.building} | Tang: ${activeProduct?.floor}`, 25, 63);
-    doc.text(`- Dien tich: ${activeProduct?.area || activeProduct?.dientich} m2 | Huong: ${activeProduct?.direction || activeProduct?.huong}`, 25, 70);
-    doc.text(`- Gia niem yet: ${Number(activeProduct?.gianiemyet || activeProduct?.prices?.[0]?.amount).toLocaleString('vi-VN')} VND`, 25, 77);
-
-    doc.setFontSize(12);
-    doc.text('2. THONG TIN HOP DONG & KHACH HANG [HopDong]:', 20, 90);
-    doc.setFontSize(10);
-    doc.text(`- Khach hang: ${formData.hotenKH}`, 25, 98);
-    doc.text(`- So dien thoai: ${formData.sodienthoaiKH}`, 25, 105);
-    doc.text(`- CCCD: ${formData.cccdKH}`, 25, 112);
-    doc.text(`- Phuong an thanh toan: ${formData.phuonganthanhtoan}`, 25, 119);
-    doc.text(`- Gia hop dong: ${Number(formData.giahopdong).toLocaleString('vi-VN')} VND`, 25, 126);
-    doc.text(`- Doanh so: ${Number(formData.doanhso).toLocaleString('vi-VN')} VND`, 25, 133);
-    doc.text(`- Hoa hong: ${Number(formData.hoahong).toLocaleString('vi-VN')} VND`, 25, 140);
-    doc.text(`- Trang thai hop dong: ${contract?.signingStatus === 'DA_KY' ? 'DA KY' : 'CHO DUYET'}`, 25, 147);
-
-    doc.save(`HopDong_${formData.maHopdong}.pdf`);
   };
 
   const isManager = currentRole === 'MANAGER';
@@ -722,17 +686,6 @@ export function ComprehensiveContractModal({
 
         {/* Footer Actions */}
         <div className="p-4 bg-slate-900 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center space-x-2">
-            <button
-              type="button"
-              onClick={handleExportPDF}
-              className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center space-x-1.5 transition"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Xuất PDF</span>
-            </button>
-          </div>
-
           <div className="flex items-center space-x-3">
             <button
               type="button"

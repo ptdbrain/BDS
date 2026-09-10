@@ -104,6 +104,12 @@ export function InventoryMatrix({
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const isProjectUnreleased = selectedProject?.status === 'UPCOMING';
+  const currentEmployeeIds = new Set(
+    [currentUser?.id, currentUser?.employeeCode, currentUser?.maNV].filter(Boolean)
+  );
+  const isBookingOwnedByCurrentSales = (booking: any) => currentEmployeeIds.has(booking.salesEmployeeId)
+    || currentEmployeeIds.has(booking.salesEmployee?.employeeCode)
+    || currentEmployeeIds.has(booking.salesEmployee?.maNV);
 
   const fetchBookings = async () => {
     setIsLoadingBookings(true);
@@ -176,7 +182,9 @@ export function InventoryMatrix({
         body: JSON.stringify({
           customerName: editingBooking.customerName,
           customerPhone: editingBooking.customerPhone,
-          notes: editingBooking.notes
+          notes: editingBooking.notes,
+          actorRole: currentRole,
+          actorId: currentUser?.id
         })
       });
 
@@ -196,7 +204,7 @@ export function InventoryMatrix({
     }
   };
 
-  // Sales Admin confirms deposit payment -> sets DANG_KHOP & starts 10-minute matching window
+  // Sales Admin confirms deposit payment -> creates the next queue turn
   const handleApproveBooking = async (bookingId: string) => {
     setIsApprovingBooking(bookingId);
     try {
@@ -207,6 +215,7 @@ export function InventoryMatrix({
         body: JSON.stringify({
           actorId: currentUser?.id || 'emp_sales_admin',
           actorName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          actorRole: currentRole,
           notes: 'Sales Admin xác nhận đã nhận cọc VietQR 50.000.000 VNĐ hợp lệ',
           bookingData: targetBooking,
           maLuotBooking: targetBooking?.maLuotBooking
@@ -228,9 +237,7 @@ export function InventoryMatrix({
           if (idx >= 0) {
             customList[idx] = {
               ...customList[idx],
-              trangthaikhopcan: 'DANG_KHOP',
-              tgBatdaukhop: new Date(),
-              tgKetthuckhopcan: new Date(Date.now() + 10 * 60 * 1000)
+              ...(data?.data?.currentBooking || {})
             };
             localStorage.setItem('ahs_custom_bookings', JSON.stringify(customList));
           }
@@ -240,7 +247,7 @@ export function InventoryMatrix({
       await fetchBookings();
       onRefresh();
       broadcastSync('BOOKING_UPDATED');
-      alert('Xác nhận thanh toán cọc 50M thành công! Đã thêm lượt chính thức vào bảng Booking và kích hoạt 10 PHÚT KHỚP CĂN.');
+      alert('Xác nhận thanh toán cọc 50M thành công! Đã tạo lượt booking tiếp theo nối tiếp trong bảng.');
     } catch (err: any) {
       alert(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -260,6 +267,7 @@ export function InventoryMatrix({
           productId: product.id,
           salesEmployeeId: currentUser?.id || 'NV001',
           salesEmployeeName: currentUser?.fullName || 'Trần Văn Nam (Sales)',
+          actorRole: currentRole,
           productData: product,
           bookingData: targetBooking,
           maLuotBooking: targetBooking?.maLuotBooking
@@ -348,7 +356,8 @@ export function InventoryMatrix({
 
   // Active matching booking (status DANG_KHOP and within 10-minute window)
   // Quy tắc: Nếu chưa tới giờ ra hàng (isWaitingForLaunch), không có lượt booking nào được khớp căn!
-  const activeMatchingBooking = !isWaitingForLaunch ? bookings.find((b) => {
+  const activeMatchingBooking = currentRole === 'SALES' && !isWaitingForLaunch ? bookings.find((b) => {
+    if (!isBookingOwnedByCurrentSales(b)) return false;
     if (!b.depositConfirmedAt) return false;
     if (b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp') return false;
     if (!b.tgBatdaukhop || !b.tgKetthuckhopcan) return false;
@@ -358,12 +367,8 @@ export function InventoryMatrix({
   }) : null;
 
   // Pending booking waiting for deposit confirmation in this project
-  const pendingBookingInProject = bookings.find((b) =>
-    b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
-  );
-  const allPendingBookings = bookings.filter((b) =>
-    b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
-  );
+  const pendingBookingInProject = bookings.find((b) => b.trangthaikhopcan === 'CHO_DUYET_COC');
+  const allPendingBookings = bookings.filter((b) => b.trangthaikhopcan === 'CHO_DUYET_COC');
 
   // Calculate remaining matching minutes
   const matchingMinutesRemaining = activeMatchingBooking?.tgKetthuckhopcan
@@ -662,13 +667,15 @@ export function InventoryMatrix({
               >
                 <RefreshCw className={`w-4 h-4 ${isLoadingBookings ? 'animate-spin text-amber-400' : ''}`} />
               </button>
-              <button
-                onClick={() => setIsBookingModalOpen(true)}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black uppercase flex items-center space-x-2 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>+ Đăng Ký Lượt Booking</span>
-              </button>
+              {currentRole === 'SALES' && (
+                <button
+                  onClick={() => setIsBookingModalOpen(true)}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-xs font-black uppercase flex items-center space-x-2 shadow-lg shadow-amber-500/20 hover:from-amber-400 hover:to-orange-400 transition"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>+ Đăng Ký Lượt Booking</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -882,6 +889,7 @@ export function InventoryMatrix({
                             {b.salesEmployee?.fullName || 'Nguyễn Văn Nam (Sales)'}
                           </td>
                           <td className="p-3.5 text-right whitespace-nowrap space-x-2">
+                            {currentRole === 'SALES' && isBookingOwnedByCurrentSales(b) && (
                             <button
                               onClick={() => setEditingBooking({ ...b })}
                               className="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-[11px] border border-amber-500/30 transition inline-flex items-center space-x-1 shadow"
@@ -890,8 +898,9 @@ export function InventoryMatrix({
                               <Edit className="w-3 h-3" />
                               <span>Sửa TT Booking</span>
                             </button>
+                            )}
 
-                            {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && (isPendingDeposit || b.trangthaikhopcan === 'CHO_KHOP') && (
+                            {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPendingDeposit && (
                               <button
                                 onClick={() => handleApproveBooking(b.id)}
                                 disabled={isApprovingBooking === b.id}
@@ -1025,8 +1034,8 @@ export function InventoryMatrix({
                   </p>
                   <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
                     {currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER'
-                      ? 'Sales Admin nhấn duyệt bên phải để lập tức kích hoạt 10 PHÚT KHỚP CĂN cho Sales.'
-                      : 'Đang chờ Sales Admin xác nhận nhận tiền cọc trong mục Giao Dịch để kích hoạt 10 phút khớp căn.'}
+                      ? 'Sales Admin nhấn duyệt để tạo lượt booking kế tiếp nối tiếp theo thứ tự.'
+                      : 'Đang chờ Sales Admin xác nhận nhận tiền cọc để tạo lượt booking kế tiếp.'}
                   </p>
                 </div>
               </div>
@@ -1038,7 +1047,7 @@ export function InventoryMatrix({
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase shadow-lg shadow-emerald-600/30 flex items-center space-x-2 transition shrink-0"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  <span>{isApprovingBooking === pendingBookingInProject.id ? 'Đang duyệt...' : 'Duyệt Cọc Ngay ➔ Bật 10 Phút'}</span>
+                  <span>{isApprovingBooking === pendingBookingInProject.id ? 'Đang duyệt...' : 'Duyệt Cọc ➔ Tạo Lượt Tiếp Theo'}</span>
                 </button>
               )}
             </div>
@@ -1179,7 +1188,7 @@ export function InventoryMatrix({
                                         if (allPendingBookings.length > 0) {
                                           const proceed = confirm(
                                             `Đang có ${allPendingBookings.length} lượt Booking chờ Sales Admin xác nhận cọc 50M!\n\n` +
-                                            `• Nếu muốn Khớp Căn trực tiếp sang ĐÃ BÁN (không cần QR), vui lòng nhờ Sales Admin duyệt cọc booking.\n` +
+                                            `• Sales Admin duyệt cọc chỉ tạo lượt kế tiếp trong hàng đợi, chưa khớp căn ngay.\n` +
                                             `• Nhấn OK nếu bạn vẫn muốn Khóa giữ chỗ 30 phút thông thường (quét VietQR cọc 100M).`
                                           );
                                           if (!proceed) return;
@@ -1296,7 +1305,7 @@ export function InventoryMatrix({
                                   if (allPendingBookings.length > 0) {
                                     const proceed = confirm(
                                       `Đang có ${allPendingBookings.length} lượt Booking chờ Sales Admin xác nhận cọc 50M!\n\n` +
-                                      `• Nếu muốn Khớp Căn trực tiếp sang ĐÃ BÁN (không cần QR), vui lòng nhờ Sales Admin duyệt cọc booking.\n` +
+                                      `• Sales Admin duyệt cọc chỉ tạo lượt kế tiếp trong hàng đợi, chưa khớp căn ngay.\n` +
                                       `• Nhấn OK nếu bạn vẫn muốn Khóa giữ chỗ 30 phút thông thường (quét VietQR cọc 100M).`
                                     );
                                     if (!proceed) return;

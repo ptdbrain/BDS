@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureBookingExists } from '@/lib/bookingHelper';
 import { canConfirmBookingTransaction, createFollowUpBookingDraft } from '@/lib/bookingQueue';
+import { canApproveBooking } from '@/lib/rolePolicy';
 
 export async function PATCH(
   request: Request,
@@ -16,6 +17,10 @@ export async function PATCH(
       actorName = 'Vũ Mai Phương (Sales Admin)',
       notes = 'Sales Admin xác nhận đã nhận thanh toán cọc Booking 50.000.000 VNĐ'
     } = body;
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
+    if (!canApproveBooking(actorRole)) {
+      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được xác nhận giao dịch Booking.' }, { status: 403 });
+    }
 
     let booking = await db.booking.findUnique({
       where: { id: bookingId },

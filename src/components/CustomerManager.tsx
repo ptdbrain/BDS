@@ -120,6 +120,7 @@ export function CustomerManager({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...formData,
+            actorRole: currentRole,
             actorId: currentUser?.id || 'NV001',
             actorName: currentUser?.fullName || 'Nguyễn Minh Khôi',
             lockId: prefilledLock?.id,
@@ -199,7 +200,8 @@ export function CustomerManager({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
-          reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)'
+          reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          actorRole: currentRole
         })
       });
       if (res.ok) {
@@ -232,6 +234,7 @@ export function CustomerManager({
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
           reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          actorRole: currentRole,
           notes: changeReason,
           issues: [{ field: 'cccd', code: 'VERIFICATION_REQUIRED', message: changeReason }]
         })

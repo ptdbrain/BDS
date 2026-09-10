@@ -1,4 +1,5 @@
 const normalizeRole = (role: string | null | undefined) => String(role || '').trim().toUpperCase();
+const normalizeStatus = (status: string | null | undefined) => String(status || '').trim().toUpperCase();
 
 export function canViewCompanyRevenue(role: string): boolean {
   return normalizeRole(role) === 'MANAGER';
@@ -6,6 +7,50 @@ export function canViewCompanyRevenue(role: string): boolean {
 
 export function canEditCompanyFinancials(role: string): boolean {
   return normalizeRole(role) === 'SALES_ADMIN';
+}
+
+export function canSalesActOnBooking(
+  role: string,
+  actorId: string | null | undefined,
+  bookingSalesEmployeeId: string | null | undefined
+): boolean {
+  return normalizeRole(role) === 'SALES'
+    && Boolean(actorId)
+    && Boolean(bookingSalesEmployeeId)
+    && actorId === bookingSalesEmployeeId;
+}
+
+export function canSalesConfirmPayment(
+  role: string,
+  actorId: string | null | undefined,
+  lockSalesEmployeeId: string | null | undefined
+): boolean {
+  return canSalesActOnBooking(role, actorId, lockSalesEmployeeId);
+}
+
+export function canConfirmLockTransfer(role: string, lockStatus: string | null | undefined): boolean {
+  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role))
+    && normalizeStatus(lockStatus) === 'PAYMENT_PENDING';
+}
+
+export function canRequestContractChanges(role: string): boolean {
+  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role));
+}
+
+export function canApproveBooking(role: string): boolean {
+  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role));
+}
+
+export function canOpenCustomerHandoff(role: string, paymentStatus: string | null | undefined): boolean {
+  return normalizeRole(role) === 'SALES' && normalizeStatus(paymentStatus) === 'DEPOSIT_CONFIRMED';
+}
+
+export function isSubmittedCustomerStatus(status: string | null | undefined): boolean {
+  return normalizeStatus(status) !== '' && normalizeStatus(status) !== 'DRAFT';
+}
+
+export function isSubmittedContractStatus(status: string | null | undefined): boolean {
+  return normalizeStatus(status) !== '' && normalizeStatus(status) !== 'DRAFT';
 }
 
 export function canViewCommission(

@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureContractExists } from '@/lib/contractHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { canRequestContractChanges } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -10,6 +11,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
+    if (!canRequestContractChanges(actorRole)) {
+      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được yêu cầu sửa hợp đồng.' }, { status: 403 });
+    }
     const {
       reviewerId = 'NV007',
       reviewerName = 'Vũ Mai Phương (Sales Admin)',

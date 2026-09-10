@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { canRequestContractChanges } from '@/lib/rolePolicy';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
@@ -9,6 +10,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
+    if (!canRequestContractChanges(actorRole)) {
+      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được yêu cầu nhập lại thông tin khách hàng.' }, { status: 403 });
+    }
     const { reviewerId = 'NV007', reviewerName = 'Vũ Mai Phương (Sales Admin)', issues = [], notes } = body;
 
     const verification = await db.customerVerification.findUnique({

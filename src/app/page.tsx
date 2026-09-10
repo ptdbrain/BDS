@@ -183,7 +183,11 @@ export default function Home() {
   // Fetch Customers
   const fetchCustomers = async () => {
     try {
-      const res = await fetch('/api/v1/customers');
+      const params = new URLSearchParams();
+      if (currentRole) params.set('role', currentRole);
+      if (currentUser?.employeeCode) params.set('employeeCode', currentUser.employeeCode);
+      if (currentRole === 'SALES' && currentUser?.id) params.set('salesEmployeeId', currentUser.id);
+      const res = await fetch('/api/v1/customers?' + params.toString());
       const data = await res.json();
       if (data.data) setCustomers(data.data);
     } catch (err) {
@@ -440,7 +444,7 @@ export default function Home() {
   }
 
   const activeLocksCount = locks.filter(l => l.status === 'ACTIVE' || l.status === 'PAYMENT_PENDING').length;
-  const pendingBookingsCount = bookings.filter(b => b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP').length;
+  const pendingBookingsCount = bookings.filter(b => b.trangthaikhopcan === 'CHO_DUYET_COC').length;
   const pendingVerificationsCount = customers.filter(c => c.verificationStatus === 'PENDING_VERIFICATION').length;
   const pendingContractsCount = contracts.filter(c => c.status === 'PENDING_REVIEW').length;
 

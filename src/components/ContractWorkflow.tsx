@@ -2,13 +2,11 @@
 
 import React, { useState } from 'react';
 import { UserRole } from '@/lib/types';
-import jsPDF from 'jspdf';
 import {
   FileText,
   ShieldCheck,
   CheckCircle,
   FileEdit,
-  Download,
   Building,
   DollarSign,
   User,
@@ -192,46 +190,6 @@ export function ContractWorkflow({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  // Export PDF Document
-  const handleExportContractPDF = (contract: any) => {
-    const doc = new jsPDF();
-    const snapshot = contract.snapshotJson ? JSON.parse(contract.snapshotJson) : {};
-
-    doc.setFontSize(18);
-    doc.setTextColor(26, 52, 100);
-    doc.text('CONG TY CO PHAN BAT DONG SAN AHS (AHS PROPERTY)', 20, 25);
-
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text('AHS PROPERTY JSC - HE THONG QUAN LY HOP DONG MUA BAN CDT', 20, 32);
-    doc.line(20, 36, 190, 36);
-
-    doc.setFontSize(15);
-    doc.setTextColor(0, 0, 0);
-    doc.text('THONG TIN HOP DONG MUA BAN CAN HO TU CHU DAU TU', 40, 50);
-
-    doc.setFontSize(11);
-    doc.text(`So Hop Dong CDT: ${contract.investorContractNo || contract.contractNumber}`, 20, 65);
-    doc.text(`Thoi Gian Ky: ${contract.signedDate ? new Date(contract.signedDate).toLocaleDateString('vi-VN') : 'Chua ky'}`, 20, 73);
-    doc.text(`Trang Thai Ky: ${contract.signingStatus === 'DA_KY' ? 'DA KY' : contract.signingStatus === 'CHAM_KY' ? 'CHAM KY' : 'CHUA KY'}`, 20, 81);
-    doc.text(`Doanh So Giao Dich: ${Number(contract.dealRevenue || contract.agreedPrice).toLocaleString('vi-VN')} VND`, 20, 89);
-    doc.text(`Trang Thai Hoa Hong: ${contract.commissionStatus === 'DA_TRA' ? 'DA TRA' : `Du kien tra ${contract.commissionDueDate || '25/10'}`}`, 20, 97);
-    doc.text(`Hoa Hong Nhan Vien: ${Number(contract.commissionAmount ?? contract.hoahong ?? 0).toLocaleString('vi-VN')} VND`, 20, 105);
-
-    doc.setFontSize(13);
-    doc.setTextColor(0, 102, 255);
-    doc.text('THONG TIN CAN HO & KHACH HANG', 20, 120);
-    doc.setFontSize(10);
-    doc.setTextColor(50, 50, 50);
-    doc.text(`Ma Can: ${contract.product?.productCode}`, 20, 130);
-    doc.text(`Toa: ${contract.product?.building}`, 20, 137);
-    doc.text(`Khach Hang: ${contract.customer?.fullName}`, 20, 144);
-    doc.text(`So Dien Thoai: ${contract.customer?.phone}`, 20, 151);
-    doc.text(`Nhan Vien Kinh Doanh: ${contract.salesEmployee?.fullName || 'Tran Van Nam'}`, 20, 158);
-
-    doc.save(`HopDongCDT_${contract.investorContractNo || contract.contractNumber}.pdf`);
   };
 
   const isManager = currentRole === 'MANAGER';
@@ -433,15 +391,6 @@ export function ContractWorkflow({
                             Hợp Đồng Toàn Bộ
                           </button>
                         )}
-
-                        <button
-                          onClick={() => handleExportContractPDF(ct)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-white text-[11px] font-semibold transition"
-                          title="Xuất file PDF"
-                        >
-                          <Download className="w-3.5 h-3.5 inline mr-1" />
-                          <span>PDF</span>
-                        </button>
 
                         {isSalesAdmin && (
                           <button

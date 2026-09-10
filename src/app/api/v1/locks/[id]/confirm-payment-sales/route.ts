@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureProductExists } from '@/lib/productHelper';
+import { canSalesConfirmPayment } from '@/lib/rolePolicy';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function POST(
   request: Request,
@@ -14,7 +16,8 @@ export async function POST(
       actorId = 'emp_sales_01',
       actorName = 'Nguyễn Minh Khôi (Sales)',
       notes = 'Nhân viên kinh doanh xác nhận khách hàng đã chuyển khoản cọc VietQR 100.000.000 VNĐ',
-      lockData
+      lockData,
+      actorRole = request.headers.get('x-user-role') || 'SALES'
     } = body;
 
     let lock = await db.productLock.findUnique({
@@ -68,6 +71,19 @@ export async function POST(
 
     if (!lock) {
       return NextResponse.json({ error: 'Không tìm thấy lượt lock' }, { status: 404 });
+    }
+
+    const resolvedActorId = await resolveEmployeeId(actorId, 'SALES');
+    if (!canSalesConfirmPayment(actorRole, resolvedActorId, lock.salesEmployeeId)) {
+      return NextResponse.json({
+        error: 'Chỉ Sales phụ trách lượt lock mới được xác nhận khách đã chuyển khoản.'
+      }, { status: 403 });
+    }
+
+    if (!['ACTIVE', 'PAYMENT_PENDING'].includes(lock.status)) {
+      return NextResponse.json({
+        error: `Lượt lock hiện ở trạng thái ${lock.status}, không thể xác nhận lại thanh toán.`
+      }, { status: 409 });
     }
 
     const updatedLock = await db.productLock.update({

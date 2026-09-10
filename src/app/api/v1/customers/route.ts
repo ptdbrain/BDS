@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { encryptPII, decryptPII, hashPII } from '@/lib/security';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { isSubmittedCustomerStatus } from '@/lib/rolePolicy';
 
 function maskCCCD(cccd: string) {
   if (!cccd || cccd.length < 4) return '********';
@@ -32,9 +33,25 @@ export async function GET(request: Request) {
     const actorId = searchParams.get('actorId') || 'UNKNOWN';
     const actorName = searchParams.get('actorName') || 'Nguoi dung he thong';
     const salesEmployeeId = searchParams.get('salesEmployeeId');
+    const role = (searchParams.get('role') || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    const employeeCode = searchParams.get('employeeCode') || request.headers.get('x-employee-code') || '';
 
-    const whereCondition: any = {};
-    if (salesEmployeeId) {
+    if (role === 'PRODUCT_ADMIN') {
+      return NextResponse.json({ error: 'Nhân viên quản lý sản phẩm không có quyền xem thông tin khách hàng.' }, { status: 403 });
+    }
+
+    const whereCondition: any = {
+      verificationStatus: { not: 'DRAFT' }
+    };
+    if (role === 'SALES') {
+      const actorEmployee = employeeCode || salesEmployeeId;
+      if (!actorEmployee) return NextResponse.json({ data: [] });
+      const resolvedSalesEmployeeId = await resolveEmployeeId(actorEmployee, 'SALES');
+      whereCondition.OR = [
+        { verifications: { some: { submittedById: resolvedSalesEmployeeId } } },
+        { contracts: { some: { salesEmployeeId: resolvedSalesEmployeeId } } }
+      ];
+    } else if (salesEmployeeId) {
       whereCondition.verifications = {
         some: { submittedById: salesEmployeeId }
       };
@@ -58,7 +75,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' }
     });
 
-    if (revealPII && actorId !== 'UNKNOWN') {
+    if (revealPII && actorId !== 'UNKNOWN' && (role === 'SALES_ADMIN' || role === 'MANAGER')) {
       await createAuditLog({
         actorId,
         actorName,
@@ -94,7 +111,7 @@ export async function GET(request: Request) {
         dateOfBirth: extra.dateOfBirth || '1990-01-01',
         phone: c.phone,
         email: c.email,
-        cccd: plainCCCD,
+      cccd: (role === 'SALES_ADMIN' || role === 'MANAGER') ? plainCCCD : undefined,
         permanentAddress: extra.permanentAddress || plainAddress,
         contactAddress: extra.contactAddress || plainAddress,
         verificationStatus: c.verificationStatus,
@@ -124,11 +141,11 @@ export async function GET(request: Request) {
           fullName: salesEmp?.fullName || 'Trần Văn Nam',
           employeeCode: salesEmp?.employeeCode || 'NV-SALE-01'
         },
-        cccdDisplay: revealPII ? plainCCCD : maskCCCD(c.cccdCiphertext),
-        phoneDisplay: revealPII ? c.phone : maskPhone(c.phone),
-        addressDisplay: revealPII ? (extra.permanentAddress || plainAddress) : maskAddress(c.addressCiphertext)
+        cccdDisplay: revealPII && (role === 'SALES_ADMIN' || role === 'MANAGER') ? plainCCCD : maskCCCD(c.cccdCiphertext),
+        phoneDisplay: revealPII && (role === 'SALES_ADMIN' || role === 'MANAGER') ? c.phone : maskPhone(c.phone),
+        addressDisplay: revealPII && (role === 'SALES_ADMIN' || role === 'MANAGER') ? (extra.permanentAddress || plainAddress) : maskAddress(c.addressCiphertext)
       };
-    });
+    }).filter(c => isSubmittedCustomerStatus(c.verificationStatus));
 
     return NextResponse.json({ data: processed });
   } catch (error: any) {

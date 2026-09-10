@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureProductExists } from '@/lib/productHelper';
+import { canConfirmLockTransfer } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -13,7 +14,8 @@ export async function POST(
       actorId = 'emp_admin_01',
       actorName = 'Phạm Thị Mai',
       notes = 'Sales Admin xác nhận đã nhận tiền chuyển khoản cọc thành công',
-      lockData
+      lockData,
+      actorRole = request.headers.get('x-user-role') || 'SALES_ADMIN'
     } = body;
 
     let lock = await db.productLock.findUnique({
@@ -79,6 +81,14 @@ export async function POST(
         code: 'LOCK_NOT_FOUND',
         detail: `Không tìm thấy thông tin lượt lock với ID: ${params.id}`
       }, { status: 404 });
+    }
+
+    if (!canConfirmLockTransfer(actorRole, lock.status)) {
+      return NextResponse.json({
+        error: lock.status === 'DEPOSIT_CONFIRMED'
+          ? 'Lượt lock đã được xác nhận thanh toán trước đó.'
+          : 'Sales Admin chỉ được xác nhận chuyển khoản sau khi Sales gửi xác nhận thanh toán.'
+      }, { status: 409 });
     }
 
     const now = new Date();
@@ -152,20 +162,17 @@ export async function POST(
           }
         });
       } else {
-        let customer = await tx.customer.findFirst();
-        if (!customer) {
-          customer = await tx.customer.create({
-            data: {
-              fullName: 'Khách mua căn ' + lock.product.productCode,
-              phone: '0912345678',
-              email: 'khachhang@example.com',
-              cccdCiphertext: 'ENC_001200008888',
-              cccdHash: '001200008888',
-              addressCiphertext: 'Hà Nội',
-              verificationStatus: 'VERIFIED'
-            }
-          });
-        }
+        const customer = await tx.customer.create({
+          data: {
+            fullName: `Chờ NVKD nhập khách hàng - ${lock.product.productCode}`,
+            phone: `DRAFT-${lock.id.slice(0, 12)}`,
+            email: `draft-${lock.id}@pending.ahs.local`,
+            cccdCiphertext: `ENC_DRAFT_${lock.id}`,
+            cccdHash: `DRAFT_${lock.id}`,
+            addressCiphertext: 'DRAFT',
+            verificationStatus: 'DRAFT'
+          }
+        });
 
         let plan = await tx.paymentPlan.findFirst({
           where: { projectId: lock.product.projectId }
@@ -222,7 +229,7 @@ export async function POST(
         });
       }
 
-      return { lock: updatedLock, product: updatedProduct };
+      return { lock: updatedLock, product: updatedProduct, contract: savedContract };
     });
 
     // 6. Create Audit Log

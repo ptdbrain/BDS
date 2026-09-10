@@ -102,7 +102,7 @@ export function Sidebar({
     },
     {
       id: 'reports' as TabType,
-      label: '2. Báo Cáo Sản Phẩm',
+      label: '2. Báo Cáo',
       desc: 'Lượng hàng bán theo dự án (Chỉ xem)',
       icon: BarChart3,
       badge: null
@@ -174,7 +174,7 @@ export function Sidebar({
     },
     {
       id: 'reports' as TabType,
-      label: 'Báo Cáo Tổng Hợp',
+      label: 'Báo Cáo',
       desc: 'Doanh thu, doanh số & KPI toàn công ty',
       icon: TrendingUp,
       badge: null

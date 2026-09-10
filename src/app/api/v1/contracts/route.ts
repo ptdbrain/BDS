@@ -5,6 +5,7 @@ import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { ensureProductExists } from '@/lib/productHelper';
 import { getAuthorizedFinancialFields, sanitizeContractForRole } from '@/lib/contractFinancialPolicy';
+import { isSubmittedContractStatus } from '@/lib/rolePolicy';
 
 export async function GET(request: Request) {
   try {
@@ -17,7 +18,21 @@ export async function GET(request: Request) {
     const isSalesAdmin = role === 'SALES_ADMIN';
     const isSales = role === 'SALES';
 
+    if (role === 'PRODUCT_ADMIN') {
+      return NextResponse.json({ error: 'Nhân viên quản lý sản phẩm không có quyền xem danh sách hợp đồng.' }, { status: 403 });
+    }
+
+    const employeeFilter = isSales
+      ? (employeeCode
+        ? { salesEmployee: { OR: [{ employeeCode }, { maNV: employeeCode }] } }
+        : null)
+      : undefined;
+    if (isSales && !employeeFilter) {
+      return NextResponse.json({ data: [] });
+    }
+
     const contracts = await db.contract.findMany({
+      where: employeeFilter || undefined,
       include: {
         product: { include: { project: true } },
         customer: true,
@@ -28,7 +43,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' }
     });
 
-    const sanitized = contracts.map(c => sanitizeContractForRole(c, role, employeeCode));
+    const sanitized = contracts
+      .filter(c => isSales || isSubmittedContractStatus(c.status))
+      .map(c => sanitizeContractForRole(c, role, employeeCode));
 
     return NextResponse.json({ data: sanitized });
   } catch (error: any) {

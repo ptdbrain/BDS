@@ -113,45 +113,21 @@ export async function POST(request: Request) {
       }, { status: 200 }); // Return 200 to gateway to avoid retry flood
     }
 
-    // 3. Normal Success Path
+    // 3. Valid payment is queued for Sales Admin reconciliation.
+    // The gateway must not finalize the lock or product on its own.
     await db.$transaction(async (tx) => {
-      // Update payment -> SUCCEEDED
       await tx.paymentTransaction.update({
         where: { id: payment.id },
         data: {
-          status: 'SUCCEEDED',
+          status: 'REVIEW_REQUIRED',
           paidAt: new Date(paidAt),
-          rawSummary: 'Xác nhận cọc VietQR thành công tự động'
+          rawSummary: 'Đã nhận giao dịch hợp lệ từ VietQR, chờ Sales Admin đối soát'
         }
       });
 
-      // Update Lock -> DEPOSIT_CONFIRMED
       await tx.productLock.update({
         where: { id: payment.lockId },
-        data: {
-          status: 'DEPOSIT_CONFIRMED',
-          depositConfirmedAt: new Date(paidAt)
-        }
-      });
-
-      // Update Product -> DEPOSITED
-      await tx.product.update({
-        where: { id: payment.lock.productId },
-        data: {
-          status: 'DEPOSITED',
-          version: { increment: 1 }
-        }
-      });
-
-      // History log
-      await tx.productStatusHistory.create({
-        data: {
-          productId: payment.lock.productId,
-          fromStatus: 'LOCKED',
-          toStatus: 'DEPOSITED',
-          reason: `Xác nhận chuyển cọc thành công ${Number(amount).toLocaleString('vi-VN')} VND qua VietQR`,
-          actorId: 'VIETQR_GATEWAY'
-        }
+        data: { status: 'PAYMENT_PENDING' }
       });
     });
 
@@ -165,12 +141,12 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({
-      status: 'SUCCEEDED',
-      message: 'Xác nhận cọc thành công!',
+      status: 'REVIEW_REQUIRED',
+      message: 'Đã ghi nhận giao dịch hợp lệ. Sales Admin cần đối soát và xác nhận trước khi căn chuyển sang Đã bán.',
       data: {
         paymentId: payment.id,
         productId: payment.lock.productId,
-        status: 'DEPOSITED'
+        status: 'PAYMENT_PENDING'
       }
     });
 

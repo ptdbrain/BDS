@@ -6,8 +6,6 @@ import {
   Clock,
   QrCode,
   CheckCircle,
-  XCircle,
-  AlertTriangle,
   Building,
   RefreshCw,
   Copy,
@@ -58,8 +56,6 @@ export function LockManager({
   const [isApprovingBooking, setIsApprovingBooking] = useState<string | null>(null);
   const [selectedLockForQR, setSelectedLockForQR] = useState<any | null>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
-  const [isSimulating, setIsSimulating] = useState<boolean>(false);
-  const [simulationResult, setSimulationResult] = useState<any | null>(null);
   const [now, setNow] = useState<number>(Date.now());
   const [contractModalData, setContractModalData] = useState<{
     isOpen: boolean;
@@ -107,52 +103,6 @@ export function LockManager({
     };
   };
 
-  // Simulate Webhook trigger
-  const handleSimulateWebhook = async (type: 'SUCCESS' | 'LATE' | 'MISMATCH') => {
-    if (!selectedLockForQR) return;
-    const payment = selectedLockForQR.payments?.[0];
-    if (!payment) return;
-
-    setIsSimulating(true);
-    setSimulationResult(null);
-
-    try {
-      let payloadAmount = payment.amount;
-      let paidAt = new Date().toISOString();
-
-      if (type === 'MISMATCH') {
-        payloadAmount = 50000000; // Transfer only 50M
-      } else if (type === 'LATE') {
-        // Paid 35 minutes later
-        paidAt = new Date(Date.now() + 35 * 60 * 1000).toISOString();
-      }
-
-      const res = await fetch('/api/v1/payments/webhooks/vietqr', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Provider-Signature': 'SIG_VALID_AHS_SECURITY_KEY'
-        },
-        body: JSON.stringify({
-          eventId: `sim_evt_${Date.now()}`,
-          providerReference: payment.providerReference,
-          amount: payloadAmount,
-          paidAt,
-          eventType: 'payment.succeeded'
-        })
-      });
-
-      const data = await res.json();
-      setSimulationResult(data);
-      onRefresh();
-      broadcastSync('ALL_DATA_UPDATED');
-    } catch (err: any) {
-      setSimulationResult({ error: err.message });
-    } finally {
-      setIsSimulating(false);
-    }
-  };
-
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
 
   // Sales confirms customer paid 100M deposit
@@ -160,14 +110,14 @@ export function LockManager({
     setIsConfirmingPaymentSales(true);
     setActionSuccessMsg(null);
     try {
-      const targetLock = locks.find(l => l.id === lockId) || selectedLockForQR;
       const res = await fetch(`/api/v1/locks/${lockId}/confirm-payment-sales`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actorId: currentUser?.id || 'emp_sales_01',
           actorName: currentUser?.fullName || 'Trần Văn Nam (Sales)',
-          notes: 'Nhân viên kinh doanh xác nhận khách hàng đã nộp cọc 100.000.000 VNĐ'
+          notes: 'Nhân viên kinh doanh xác nhận khách hàng đã nộp cọc 100.000.000 VNĐ',
+          actorRole: currentRole
         })
       });
 
@@ -182,10 +132,7 @@ export function LockManager({
       onRefresh();
       broadcastSync('ALL_DATA_UPDATED');
 
-      // Tự động mở bảng khai báo thông tin khách hàng ngay lập tức cho NVKD
-      if (onProceedToCustomer && targetLock) {
-        onProceedToCustomer(targetLock);
-      }
+      // Chỉ Sales Admin xác nhận xong mới được chuyển giao hồ sơ cho Sales.
     } catch (err: any) {
       alert(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -205,7 +152,9 @@ export function LockManager({
         body: JSON.stringify({
           customerName: editingBooking.customerName,
           customerPhone: editingBooking.customerPhone,
-          notes: editingBooking.notes
+          notes: editingBooking.notes,
+          actorRole: currentRole,
+          actorId: currentUser?.id
         })
       });
       const data = await res.json();
@@ -236,6 +185,7 @@ export function LockManager({
           actorId: 'emp_admin_01',
           actorName: 'Phạm Thị Mai',
           notes: 'Sales Admin xác nhận đã nhận chuyển khoản cọc hợp lệ từ ngân hàng',
+          actorRole: currentRole,
           lockData: lockObj
         })
       });
@@ -277,14 +227,14 @@ export function LockManager({
     }
   };
 
-  // Sales Admin confirms Booking 50M Deposit -> Sets DANG_KHOP & starts 10m countdown
+  // Sales Admin confirms Booking 50M Deposit -> creates the next queue turn
   const handleApproveBooking = async (bookingId: string) => {
     setIsApprovingBooking(bookingId);
     setActionSuccessMsg(null);
     try {
       const targetBooking = bookings.find((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
       const res = await fetch(`/api/v1/bookings/${bookingId}/approve`, {
-        method: 'PATCH',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           actorId: currentUser?.id || 'emp_sales_admin',
@@ -309,8 +259,8 @@ export function LockManager({
           const idx = customList.findIndex((b: any) => b.id === bookingId || b.maLuotBooking === bookingId);
           if (idx >= 0) {
             customList[idx] = {
-              ...customList[idx],
-              trangthaikhopcan: 'CHO_KHOP'
+               ...customList[idx],
+               ...(data?.data?.currentBooking || {})
             };
           }
           const nextBooking = data?.data?.nextBooking;
@@ -321,7 +271,7 @@ export function LockManager({
         }
       } catch (e) {}
 
-      setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Lượt booking đã được xếp vào hàng đợi khớp căn theo thứ tự.');
+      setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Hệ thống đã tạo lượt booking tiếp theo nối tiếp theo thứ tự.');
       onRefresh();
       broadcastSync('BOOKING_UPDATED');
       broadcastSync('ALL_DATA_UPDATED');
@@ -343,11 +293,17 @@ export function LockManager({
 
   // Group bookings
   const pendingBookings = (bookings || []).filter(
-    (b) => b.trangthaikhopcan === 'CHO_DUYET_COC' || b.trangthaikhopcan === 'CHO_KHOP'
+    (b) => b.trangthaikhopcan === 'CHO_DUYET_COC'
   );
   const activeMatchingBookings = (bookings || []).filter(
     (b) => b.trangthaikhopcan === 'DANG_KHOP' && b.tgKetthuckhopcan && new Date(b.tgKetthuckhopcan).getTime() > now
   );
+  const currentEmployeeIds = new Set(
+    [currentUser?.id, currentUser?.employeeCode, currentUser?.maNV].filter(Boolean)
+  );
+  const isBookingOwnedByCurrentSales = (booking: any) => currentEmployeeIds.has(booking.salesEmployeeId)
+    || currentEmployeeIds.has(booking.salesEmployee?.employeeCode)
+    || currentEmployeeIds.has(booking.salesEmployee?.maNV);
 
   return (
     <div className="space-y-6">
@@ -644,17 +600,17 @@ export function LockManager({
                         <span>Chế độ chỉ xem (Không có quyền xác nhận cọc)</span>
                       </div>
                     </div>
-                  ) : currentRole === 'SALES_ADMIN' ? (
+                  ) : currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? (
                     // SALES ADMIN: Confirm Transfer Button (Converts to SOLD)
                     <div className="space-y-2 pt-2">
-                      <button
+                      {lock.status === 'PAYMENT_PENDING' && <button
                         onClick={() => handleAdminConfirmTransfer(lock.id)}
                         disabled={isConfirmingTransfer === lock.id}
                         className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition"
                       >
                         <CheckCircle className="w-4 h-4" />
                         <span>{isConfirmingTransfer === lock.id ? 'Đang cập nhật...' : 'Xác Nhận Đã Nhận Chuyển Khoản → Đã bán'}</span>
-                      </button>
+                      </button>}
 
                       <div className="flex items-center space-x-2">
                         <button
@@ -683,11 +639,11 @@ export function LockManager({
                             <span>Đã Gửi Xác Nhận Cọc 100M (Chờ Admin Duyệt)</span>
                           </div>
                           <button
-                            onClick={() => onProceedToCustomer && onProceedToCustomer(lock)}
+                            disabled
                             className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-2 shadow-lg transition shadow-emerald-500/20"
                           >
                             <UserCheck className="w-4 h-4" />
-                            <span>📋 Khai Báo / Xem Thông Tin Khách Hàng ➔</span>
+                            <span>Chờ Sales Admin xác nhận xong mới mở hồ sơ khách hàng</span>
                           </button>
                         </div>
                       ) : (
@@ -905,14 +861,16 @@ export function LockManager({
                           {b.salesEmployee?.fullName || 'Nguyễn Minh Khôi'}
                         </td>
                         <td className="p-3.5 text-right whitespace-nowrap space-x-1.5">
-                          <button
-                            onClick={() => setEditingBooking(b)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-[11px] inline-flex items-center space-x-1 transition border border-slate-700"
-                            title="Sửa thông tin khách hàng booking"
-                          >
-                            <Edit className="w-3 h-3" />
-                            <span>Sửa TT Booking</span>
-                          </button>
+                          {currentRole === 'SALES' && isBookingOwnedByCurrentSales(b) && (
+                            <button
+                              onClick={() => setEditingBooking(b)}
+                              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-semibold text-[11px] inline-flex items-center space-x-1 transition border border-slate-700"
+                              title="Sửa thông tin khách hàng booking"
+                            >
+                              <Edit className="w-3 h-3" />
+                              <span>Sửa TT Booking</span>
+                            </button>
+                          )}
 
                           {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt && (
                             <button
@@ -951,7 +909,6 @@ export function LockManager({
               <button
                 onClick={() => {
                   setSelectedLockForQR(null);
-                  setSimulationResult(null);
                 }}
                 className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
               >
@@ -992,100 +949,35 @@ export function LockManager({
                   <span>{isConfirmingPaymentSales ? 'Đang gửi...' : 'Nhân Viên KD: Xác Nhận Khách Đã Nộp Cọc 100M'}</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    const lock = selectedLockForQR;
-                    setSelectedLockForQR(null);
-                    if (onProceedToCustomer && lock) {
-                      onProceedToCustomer(lock);
-                    }
-                  }}
-                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center space-x-1.5 transition"
-                >
-                  <UserCheck className="w-4 h-4 text-brand-600" />
-                  <span>📋 Điền Thông Tin Khách Hàng Cho Căn Này →</span>
-                </button>
-              </div>
-
-              {/* SIMULATED BANK WEBHOOK PANEL */}
-              <div className="space-y-4 flex flex-col justify-between">
-                <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
-                  <div className="flex items-center space-x-2 text-xs font-bold text-amber-400">
-                    <Zap className="w-4 h-4" />
-                    <span>Giả Lập Webhook Cổng Thanh Toán (Testing Panel)</span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    Thực hiện kiểm thử các kịch bản webhook nhận tiền từ Ngân hàng / Napas 24/7 đối với lượt lock này:
-                  </p>
-
-                  <div className="space-y-2">
-                    {/* Option 1: Valid payment */}
-                    <button
-                      onClick={() => handleSimulateWebhook('SUCCESS')}
-                      disabled={isSimulating}
-                      className="w-full p-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 hover:bg-emerald-600/30 text-emerald-300 text-xs font-bold text-left transition flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <CheckCircle className="w-4 h-4 text-emerald-400" />
-                        <span>1. Chuyển Cọc Hợp Lệ (SUCCEEDED)</span>
-                      </div>
-                      <span className="text-[10px] bg-emerald-500/30 px-2 py-0.5 rounded">100M VND</span>
-                    </button>
-
-                    {/* Option 2: Late payment */}
-                    <button
-                      onClick={() => handleSimulateWebhook('LATE')}
-                      disabled={isSimulating}
-                      className="w-full p-2.5 rounded-xl bg-amber-600/20 border border-amber-500/40 hover:bg-amber-600/30 text-amber-300 text-xs font-bold text-left transition flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <AlertTriangle className="w-4 h-4 text-amber-400" />
-                        <span>2. Chuyển Trễ Sau 30m (LATE PAYMENT)</span>
-                      </div>
-                      <span className="text-[10px] bg-amber-500/30 px-2 py-0.5 rounded">REVIEW_REQ</span>
-                    </button>
-
-                    {/* Option 3: Wrong Amount */}
-                    <button
-                      onClick={() => handleSimulateWebhook('MISMATCH')}
-                      disabled={isSimulating}
-                      className="w-full p-2.5 rounded-xl bg-rose-600/20 border border-rose-500/40 hover:bg-rose-600/30 text-rose-300 text-xs font-bold text-left transition flex items-center justify-between"
-                    >
-                      <div className="flex items-center space-x-2">
-                        <XCircle className="w-4 h-4 text-rose-400" />
-                        <span>3. Chuyển Thiếu Số Tiền (MISMATCH)</span>
-                      </div>
-                      <span className="text-[10px] bg-rose-500/30 px-2 py-0.5 rounded">50M VND</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Result Feedback */}
-                {simulationResult && (
-                  <div className={`p-3.5 rounded-xl border text-xs space-y-1 animate-in fade-in ${
-                    simulationResult.status === 'SUCCEEDED'
-                      ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200'
-                      : 'bg-amber-950/40 border-amber-500/60 text-amber-200'
-                  }`}>
-                    <div className="font-bold flex items-center space-x-1.5">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Phản Hồi Từ Webhook Handler:</span>
-                    </div>
-                    <p className="text-[11px]">{simulationResult.message}</p>
-                    {simulationResult.status === 'SUCCEEDED' && (
-                      <button
-                        onClick={() => {
-                          const lock = selectedLockForQR;
-                          setSelectedLockForQR(null);
-                          onProceedToCustomer(lock);
-                        }}
-                        className="mt-2 w-full py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-black text-xs uppercase shadow hover:bg-emerald-400 transition"
-                      >
-                        Tiến Hành Khai Báo Khách Hàng →
-                      </button>
-                    )}
+                {selectedLockForQR.status === 'DEPOSIT_CONFIRMED' ? (
+                  <button
+                    onClick={() => {
+                      const lock = selectedLockForQR;
+                      setSelectedLockForQR(null);
+                      if (onProceedToCustomer && lock) onProceedToCustomer(lock);
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center space-x-1.5 transition"
+                  >
+                    <UserCheck className="w-4 h-4 text-brand-600" />
+                    <span>📋 Điền Thông Tin Khách Hàng Cho Căn Này →</span>
+                  </button>
+                ) : (
+                  <div className="w-full py-2 px-3 rounded-xl bg-slate-100 border border-slate-300 text-slate-600 font-bold text-xs text-center">
+                    Chờ Sales Admin xác nhận thanh toán để mở hồ sơ khách hàng.
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-4 flex flex-col justify-center">
+                <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                  <div className="flex items-center space-x-2 text-sm font-bold text-amber-300">
+                    <Zap className="w-4 h-4" />
+                    <span>Quy trình thanh toán</span>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    1. Khách quét QR và chuyển khoản. 2. Sales nhấn xác nhận đã nhận thông tin thanh toán. 3. Sales Admin đối soát và xác nhận. Sau bước 3, căn mới chuyển sang <strong className="text-purple-300">Đã bán</strong> và mở hồ sơ khách hàng.
+                  </p>
+                </div>
               </div>
             </div>
           </div>

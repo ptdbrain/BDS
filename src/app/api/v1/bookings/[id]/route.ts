@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { canSalesActOnBooking } from '@/lib/rolePolicy';
+import { resolveEmployeeId } from '@/lib/employeeHelper';
 
 export async function GET(
   request: Request,
@@ -35,9 +37,10 @@ export async function PATCH(
       customerName,
       customerPhone,
       depositAmount,
-      notes,
-      salesEmployeeId
+      notes
     } = body;
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
+    const actorId = body.actorId || request.headers.get('x-employee-id');
 
     const booking = await db.booking.findUnique({
       where: { id: params.id }
@@ -47,12 +50,16 @@ export async function PATCH(
       return NextResponse.json({ error: 'Không tìm thấy lượt booking' }, { status: 404 });
     }
 
+    const resolvedActorId = actorId ? await resolveEmployeeId(actorId, 'SALES') : '';
+    if (!canSalesActOnBooking(actorRole, resolvedActorId, booking.salesEmployeeId)) {
+      return NextResponse.json({ error: 'Chỉ Sales phụ trách lượt Booking mới được sửa thông tin lượt đó.' }, { status: 403 });
+    }
+
     const dataToUpdate: any = {};
     if (customerName !== undefined) dataToUpdate.customerName = customerName;
     if (customerPhone !== undefined) dataToUpdate.customerPhone = customerPhone;
     if (depositAmount !== undefined) dataToUpdate.depositAmount = parseFloat(String(depositAmount));
     if (notes !== undefined) dataToUpdate.notes = notes;
-    if (salesEmployeeId !== undefined) dataToUpdate.salesEmployeeId = salesEmployeeId;
 
     const updated = await db.booking.update({
       where: { id: params.id },
@@ -67,7 +74,7 @@ export async function PATCH(
       action: 'UPDATE_BOOKING_INFO',
       entityType: 'Booking',
       entityId: params.id,
-      actorId: salesEmployeeId || 'emp_sales_01',
+      actorId: resolvedActorId,
       actorName: 'Nhân viên kinh doanh',
       afterJson: dataToUpdate
     });
