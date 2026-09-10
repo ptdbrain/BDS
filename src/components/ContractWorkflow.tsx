@@ -63,9 +63,9 @@ export function ContractWorkflow({
     signedDate: new Date().toISOString().slice(0, 10),
     signingStatus: 'CHUA_KY', // CHUA_KY, DA_KY, CHAM_KY
     dealRevenue: '4800000000',
-    commissionStatus: 'DU_KIEN_TRA', // DA_TRA, DU_KIEN_TRA
-    commissionDueDate: '25/10/2026',
-    commissionAmount: '144000000',
+    commissionStatus: '',
+    commissionDueDate: '',
+    commissionAmount: '',
     investorNotes: ''
   });
 
@@ -83,7 +83,6 @@ export function ContractWorkflow({
     const firstCust = customers[0];
 
     const estimatedRevenue = firstProd?.prices?.[0]?.amount || 4800000000;
-    const estimatedComm = estimatedRevenue * 0.03;
 
     setInvestorFormData({
       contractId: '',
@@ -94,9 +93,9 @@ export function ContractWorkflow({
       signedDate: new Date().toISOString().slice(0, 10),
       signingStatus: 'CHUA_KY',
       dealRevenue: String(estimatedRevenue),
-      commissionStatus: 'DU_KIEN_TRA',
-      commissionDueDate: '25/10/2026',
-      commissionAmount: String(estimatedComm),
+      commissionStatus: '',
+      commissionDueDate: '',
+      commissionAmount: '',
       investorNotes: 'Hợp đồng phát hành từ Chủ đầu tư'
     });
     setFormError(null);
@@ -116,7 +115,7 @@ export function ContractWorkflow({
       dealRevenue: String(ct.dealRevenue || ct.agreedPrice || 4800000000),
       commissionStatus: ct.commissionStatus || 'DU_KIEN_TRA',
       commissionDueDate: ct.commissionDueDate || '25/10/2026',
-      commissionAmount: String(ct.commissionAmount || (ct.agreedPrice * 0.03) || 144000000),
+      commissionAmount: String(ct.commissionAmount ?? ''),
       investorNotes: ct.investorNotes || ''
     });
     setFormError(null);
@@ -146,8 +145,9 @@ export function ContractWorkflow({
             dealRevenue: parseFloat(investorFormData.dealRevenue),
             commissionStatus: investorFormData.commissionStatus,
             commissionDueDate: investorFormData.commissionDueDate,
-            commissionAmount: parseFloat(investorFormData.commissionAmount),
+            commissionAmount: investorFormData.commissionAmount === '' ? null : parseFloat(investorFormData.commissionAmount),
             investorNotes: investorFormData.investorNotes,
+            actorRole: currentRole,
             actorId: 'emp_admin_01',
             actorName: 'Phạm Thị Mai'
           })
@@ -171,8 +171,9 @@ export function ContractWorkflow({
             dealRevenue: parseFloat(investorFormData.dealRevenue),
             commissionStatus: investorFormData.commissionStatus,
             commissionDueDate: investorFormData.commissionDueDate,
-            commissionAmount: parseFloat(investorFormData.commissionAmount),
+            commissionAmount: investorFormData.commissionAmount === '' ? null : parseFloat(investorFormData.commissionAmount),
             investorNotes: investorFormData.investorNotes,
+            actorRole: currentRole,
             actorId: 'emp_admin_01',
             actorName: 'Phạm Thị Mai'
           })
@@ -198,13 +199,13 @@ export function ContractWorkflow({
     const doc = new jsPDF();
     const snapshot = contract.snapshotJson ? JSON.parse(contract.snapshotJson) : {};
 
-    doc.setFontSize(20);
-    doc.setTextColor(0, 102, 255);
-    doc.text('CONG TY CO PHAN BAT DONG SAN AHS', 20, 25);
+    doc.setFontSize(18);
+    doc.setTextColor(26, 52, 100);
+    doc.text('CONG TY CO PHAN BAT DONG SAN AHS (AHS PROPERTY)', 20, 25);
 
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
-    doc.text('AHS REAL ESTATE JSC - QUAN LY HOP DONG MUA BAN CDT', 20, 32);
+    doc.text('AHS PROPERTY JSC - HE THONG QUAN LY HOP DONG MUA BAN CDT', 20, 32);
     doc.line(20, 36, 190, 36);
 
     doc.setFontSize(15);
@@ -217,7 +218,7 @@ export function ContractWorkflow({
     doc.text(`Trang Thai Ky: ${contract.signingStatus === 'DA_KY' ? 'DA KY' : contract.signingStatus === 'CHAM_KY' ? 'CHAM KY' : 'CHUA KY'}`, 20, 81);
     doc.text(`Doanh So Giao Dich: ${Number(contract.dealRevenue || contract.agreedPrice).toLocaleString('vi-VN')} VND`, 20, 89);
     doc.text(`Trang Thai Hoa Hong: ${contract.commissionStatus === 'DA_TRA' ? 'DA TRA' : `Du kien tra ${contract.commissionDueDate || '25/10'}`}`, 20, 97);
-    doc.text(`Hoa Hong Nhan Vien: ${Number(contract.commissionAmount || (contract.agreedPrice * 0.03)).toLocaleString('vi-VN')} VND`, 20, 105);
+    doc.text(`Hoa Hong Nhan Vien: ${Number(contract.commissionAmount ?? contract.hoahong ?? 0).toLocaleString('vi-VN')} VND`, 20, 105);
 
     doc.setFontSize(13);
     doc.setTextColor(0, 102, 255);
@@ -233,7 +234,14 @@ export function ContractWorkflow({
     doc.save(`HopDongCDT_${contract.investorContractNo || contract.contractNumber}.pdf`);
   };
 
-  const isSalesAdmin = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER';
+  const isManager = currentRole === 'MANAGER';
+  const isSalesAdmin = currentRole === 'SALES_ADMIN';
+  const isSales = currentRole === 'SALES';
+  const isProductAdmin = currentRole === 'PRODUCT_ADMIN';
+
+  // Doanh thu thực tế AHS thu từ CĐT: CHỈ Ban Lãnh Đạo và Sales Admin được xem
+  // NVKD và QL Sản Phẩm tuyệt đối không được xem doanh thu của công ty
+  const canViewCompanyRevenue = isManager || currentRole === 'SALES_ADMIN';
 
   return (
     <div className="space-y-6">
@@ -252,7 +260,7 @@ export function ContractWorkflow({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Sales Admin nhập thông tin hợp đồng từ CĐT, doanh số và hoa hồng → Tự động chuyển về cho Nhân viên kinh doanh
+                Doanh số tự động ghi nhận theo hợp đồng • Doanh thu CĐT và Hoa hồng do Sales Admin cập nhật
               </p>
             </div>
           </div>
@@ -277,7 +285,7 @@ export function ContractWorkflow({
             <ShieldCheck className="w-4 h-4 text-purple-400" />
             <span>Danh Sách Hợp Đồng CĐT Đã Nhập ({contracts.length})</span>
           </h3>
-          <span className="text-xs text-slate-400">Dữ liệu hoa hồng & trạng thái ký tự động chuyển về cho Sales</span>
+          <span className="text-xs text-slate-400">NVKD theo dõi hoa hồng chính mình • Doanh thu công ty bảo mật cho Ban lãnh đạo</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -290,7 +298,8 @@ export function ContractWorkflow({
                 <th className="p-3.5">Sales Phụ Trách</th>
                 <th className="p-3.5">Thời Gian Ký</th>
                 <th className="p-3.5">Trạng Thái Ký</th>
-                <th className="p-3.5">Doanh Số Giao Dịch</th>
+                <th className="p-3.5">Doanh Số (Theo HĐ)</th>
+                {canViewCompanyRevenue && <th className="p-3.5 text-cyan-400">Doanh Thu CĐT</th>}
                 <th className="p-3.5">Thanh Toán Hoa Hồng</th>
                 <th className="p-3.5 text-right">Thao Tác</th>
               </tr>
@@ -298,16 +307,20 @@ export function ContractWorkflow({
             <tbody className="divide-y divide-slate-800/60 text-slate-200">
               {contracts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="p-8 text-center text-slate-500">
+                  <td colSpan={canViewCompanyRevenue ? 10 : 9} className="p-8 text-center text-slate-500">
                     Chưa có hợp đồng nào được nhập từ Chủ đầu tư. Nhấn "Nhập Hợp Đồng Từ CĐT" để thêm mới.
                   </td>
                 </tr>
               ) : (
                 contracts.map((ct) => {
                   const signingStatus = ct.signingStatus || (ct.status === 'SIGNED' ? 'DA_KY' : 'CHUA_KY');
-                  const commissionStatus = ct.commissionStatus || 'DU_KIEN_TRA';
-                  const revenue = ct.dealRevenue || ct.agreedPrice || 4800000000;
-                  const commAmount = ct.commissionAmount || revenue * 0.03;
+                  const commissionStatus = ct.commissionStatus || '';
+                  const salesAmount = ct.doanhso || ct.giahopdong || ct.agreedPrice || 4800000000;
+                  const companyRevenue = ct.doanhthu;
+                  const isMyContract = ct.salesEmployee?.employeeCode === currentUser?.employeeCode ||
+                                       ct.salesEmployeeId === currentUser?.id;
+                  const canSeeThisCommission = isSalesAdmin || isManager || isMyContract;
+                  const commAmount = ct.hoahong ?? ct.commissionAmount;
 
                   return (
                     <tr key={ct.id} className="hover:bg-slate-800/40 transition">
@@ -323,9 +336,9 @@ export function ContractWorkflow({
                         <div className="text-[10px] text-slate-400 font-mono">{ct.customer?.phone}</div>
                       </td>
                       <td className="p-3.5 font-medium text-slate-300">
-                        {ct.salesEmployee?.fullName || 'Trần Văn Nam'}
+                        {ct.salesEmployee?.fullName || 'Nguyễn Minh Khôi'}
                         <div className="text-[10px] text-slate-500 font-mono">
-                          {ct.salesEmployee?.employeeCode || 'NV-SALE-01'}
+                          {ct.salesEmployee?.employeeCode || 'NV001'}
                         </div>
                       </td>
                       <td className="p-3.5 text-slate-300">
@@ -364,29 +377,42 @@ export function ContractWorkflow({
                         )}
                       </td>
                       <td className="p-3.5 font-bold text-emerald-400">
-                        {Number(revenue).toLocaleString('vi-VN')} VND
+                        {Number(salesAmount).toLocaleString('vi-VN')} VND
+                        <div className="text-[10px] text-slate-500 font-normal">Giá trị theo HĐ</div>
                       </td>
+                      {canViewCompanyRevenue && (
+                        <td className="p-3.5 font-bold text-cyan-400">
+                          {companyRevenue == null ? 'Chưa cập nhật' : Number(companyRevenue).toLocaleString('vi-VN') + ' VND'}
+                          <div className="text-[10px] text-slate-500 font-normal">AHS thực thu CĐT</div>
+                        </td>
+                      )}
                       <td className="p-3.5">
-                        {commissionStatus === 'DA_TRA' ? (
-                          <div className="space-y-0.5">
-                            <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
-                              <CheckCircle className="w-3 h-3" />
-                              <span>Đã Trả</span>
-                            </span>
-                            <div className="text-[10px] text-emerald-400 font-semibold">
-                              {Number(commAmount).toLocaleString('vi-VN')} VND
+                        {canSeeThisCommission ? (
+                          commissionStatus === 'DA_TRA' ? (
+                            <div className="space-y-0.5">
+                              <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
+                                <CheckCircle className="w-3 h-3" />
+                                <span>Đã Trả</span>
+                              </span>
+                              <div className="text-[10px] text-emerald-400 font-semibold">
+                                {commAmount == null ? 'Chưa cập nhật' : Number(commAmount).toLocaleString('vi-VN') + ' VND'}
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="space-y-0.5">
+                              <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
+                                <Clock className="w-3 h-3" />
+                                <span>{commissionStatus === 'DU_KIEN_TRA' ? 'Dự kiến: ' + (ct.commissionDueDate || 'chưa có ngày') : 'Chưa cập nhật'}</span>
+                              </span>
+                              <div className="text-[10px] text-amber-400 font-semibold">
+                                {commAmount == null ? 'Chưa cập nhật' : Number(commAmount).toLocaleString('vi-VN') + ' VND'}
+                              </div>
+                            </div>
+                          )
                         ) : (
-                          <div className="space-y-0.5">
-                            <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
-                              <Clock className="w-3 h-3" />
-                              <span>Dự kiến: {ct.commissionDueDate || '25/10'}</span>
-                            </span>
-                            <div className="text-[10px] text-amber-400 font-semibold">
-                              {Number(commAmount).toLocaleString('vi-VN')} VND
-                            </div>
-                          </div>
+                          <span className="px-2 py-0.5 rounded text-[11px] bg-slate-800/80 text-slate-500 italic">
+                            🔒 Bảo mật
+                          </span>
                         )}
                       </td>
                       <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
@@ -484,7 +510,7 @@ export function ContractWorkflow({
                         ...investorFormData,
                         productId: prodId,
                         dealRevenue: String(amount),
-                        commissionAmount: String(amount * 0.03),
+                        commissionAmount: '',
                         investorContractNo: `HĐMB-CĐT-${prod?.productCode || 'CAN'}-2026`
                       });
                     }}
@@ -571,7 +597,7 @@ export function ContractWorkflow({
                       setInvestorFormData({
                         ...investorFormData,
                         dealRevenue: val,
-                        commissionAmount: String(num * 0.03)
+                        commissionAmount: investorFormData.commissionAmount
                       });
                     }}
                     className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-purple-500 font-bold text-emerald-400"
@@ -586,7 +612,7 @@ export function ContractWorkflow({
 
                 {/* 7. Trạng Thái Thanh Toán Hoa Hồng */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">7. Trạng Thái Thanh Toán Hoa Hồng</label>
+                  <label className="block text-slate-300 font-bold mb-1">7. Trạng Thái Hoa Hồng [TrangThaiHoaHong]</label>
                   <select
                     value={investorFormData.commissionStatus}
                     onChange={(e) => setInvestorFormData({ ...investorFormData, commissionStatus: e.target.value })}

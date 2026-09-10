@@ -244,7 +244,7 @@ function getProjectSlides(maDA) {
 
 async function main() {
   console.log('🚀 Bắt đầu nạp toàn diện CSDL thực hành SQL AHS từ file Excel...');
-  const excelPath = path.resolve(process.cwd(), 'scripts/Data_CSDL_AHS_SQL_Practice_MaMoi.xlsx');
+  const excelPath = path.resolve(process.cwd(), 'scripts/AHS_Database_v2.xlsx');
   const wb = XLSX.readFile(excelPath);
 
   // 0. Làm sạch DB cũ
@@ -303,6 +303,7 @@ async function main() {
         location: row.DiaDiem,
         investorId: inv.id,
         status: isSelling ? 'SELLING' : 'UPCOMING',
+        saleOpenAt: new Date(2026, 8, 11, 14, 0, 0), // 14h00 chiều ngày 11/09/2026
         lockDurationMinutes: 30,
         imagesJson: getProjectSlides(row.MaDA),
         // Class diagram fields
@@ -365,9 +366,20 @@ async function main() {
   console.log('👥 6/9 Nạp bảng NhanVien...');
   const nvRows = XLSX.utils.sheet_to_json(wb.Sheets['NhanVien']);
   const employeeMap = new Map();
+
+  // Map VaiTro từ Excel sang role hệ thống
+  const vaiTroToRole = {
+    'NVKD': 'SALES',
+    'SALES_ADMIN': 'SALES_ADMIN',
+    'QL_SAN_PHAM': 'PRODUCT_ADMIN',
+    'BAN_LANH_DAO': 'MANAGER'
+  };
+
   for (const row of nvRows) {
     const dept = departmentMap.get(row.MaPhongban);
     if (!dept) throw new Error(`Không tìm thấy MaPhongban ${row.MaPhongban} cho nhân viên ${row.MaNV}`);
+
+    const systemRole = vaiTroToRole[row.VaiTro] || 'SALES';
 
     const emp = await prisma.employee.create({
       data: {
@@ -376,7 +388,7 @@ async function main() {
         phone: row.SoDienThoaiNV,
         email: `${row.MaNV.toLowerCase()}@ahs.com.vn`,
         departmentId: dept.id,
-        jobTitle: row.ChucVu,
+        jobTitle: systemRole,   // Lưu system role để auth API dùng
         // Class diagram fields
         maNV: row.MaNV,
         chucvu: row.ChucVu,
@@ -486,15 +498,11 @@ async function main() {
 
     rows.sort((a, b) => Number(a.STTBooking) - Number(b.STTBooking));
 
-    // Base date for matching session: 09h10
-    const baseYear = 2026;
-    const baseMonth = 5; // Tháng 6 (0-indexed: 5)
-    let baseDay = 3;
-    if (maDA === 'DA004') baseDay = 5;
-    else if (maDA === 'DA005') baseDay = 10;
-    else if (maDA === 'DA006') baseDay = 15;
-
-    let turnStart = new Date(baseYear, baseMonth, baseDay, 9, 10, 0, 0);
+    // Thời điểm ra hàng chính thức: 14h00 chiều ngày 11/09/2026
+    // Lượt 1: 14h00 - 14h10
+    // Lượt 2: 14h10 - 14h20
+    // Lượt 3: 14h20 - 14h30, ... cho tới hết các lượt booking
+    let turnStart = new Date(2026, 8, 11, 14, 0, 0, 0);
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -510,25 +518,28 @@ async function main() {
       const endH = String(endMatch.getHours()).padStart(2, '0');
       const endM = String(endMatch.getMinutes()).padStart(2, '0');
 
+      // Nếu trong file excel đã khớp thì giữ 'DA_KHOP', còn lại là 'CHO_KHOP' (chờ ra hàng 14h00 11/09)
+      const finalStatus = row.TrangThaiKhopCan === 'Đã khớp' ? 'DA_KHOP' : (row.TrangThaiKhopCan === 'Hết thời gian' ? 'HUY' : 'CHO_KHOP');
+
       await prisma.booking.create({
         data: {
           maLuotBooking: row.MaLuotBooking,
           projectId: proj.id,
           salesEmployeeId: emp.id,
           sttBooking: stt,
-          tgBooking: parseExcelDate(row.TGBooking) || new Date(baseYear, 4, 20 + (i % 5), 9, 0, 0),
+          tgBooking: parseExcelDate(row.TGBooking) || new Date(2026, 8, 1 + (i % 7), 9, 0, 0),
           tgBatdaukhop: startMatch,
           tgKetthuckhopcan: endMatch,
-          trangthaikhopcan: row.TrangThaiKhopCan, // 'Đã khớp', 'Chưa khớp', 'Hết thời gian'
+          trangthaikhopcan: finalStatus,
           customerName: `Khách hàng Ưu tiên #${stt}`,
           customerPhone: `098${String(stt).padStart(7, '0')}`,
           depositAmount: 50000000,
-          notes: `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (Dự án ${proj.name})`
+          notes: `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (11/09/2026 - Dự án ${proj.name})`
         }
       });
     }
   }
-  console.log(`✓ Đã nạp ${bkRows.length} lượt Booking theo chuỗi 10 phút nối tiếp (09h10-09h20, 09h20-09h30,...).`);
+  console.log(`✓ Đã nạp ${bkRows.length} lượt Booking theo chuỗi 10 phút xuất phát từ 14h00 11/09/2026 (14h00-14h10, 14h10-14h20,...).`);
 
   // 8. LuotLock & HopDong kèm Giao Dịch & Khách Hàng
   console.log('🔒 & 📜 9/9 Nạp bảng LuotLock & HopDong kèm Giao Dịch & Khách Hàng...');
@@ -623,14 +634,15 @@ async function main() {
         salesEmployeeId: emp.id,
         paymentPlanId: plan.id,
         agreedPrice: Number(row.GiaHopDong),
-        dealRevenue: Number(row.DoanhSo),
+        // Doanh số giao dịch lấy từ giá hợp đồng; DoanhThu là trường Sales Admin nhập riêng.
+        dealRevenue: Number(row.DoanhSo || row.GiaHopDong),
         status: isSigned ? 'SIGNED' : 'PENDING_REVIEW',
         signingStatus: isSigned ? 'DA_KY' : 'CHUA_KY',
         signedDate: isSigned ? kyDate : null,
         signedAt: isSigned ? kyDate : null,
         commissionStatus: row.TrangThaiThanhToan === 'Hoàn tất' ? 'DA_TRA' : 'DU_KIEN_TRA',
         commissionDueDate: '30/11/2026',
-        commissionAmount: Number(row.HoaHong),
+        commissionAmount: row.HoaHong == null || row.HoaHong === '' ? null : Number(row.HoaHong),
         investorContractNo: row.MaHopDong,
         investorNotes: `Hợp đồng Mua bán chính thức CĐT - Phương án: ${row.PhuongThanhToan}`,
         snapshotJson: JSON.stringify({
@@ -643,7 +655,6 @@ async function main() {
           signingStatus: row.TrangThaiHDMB,
           paymentStatus: row.TrangThaiThanhToan
         }),
-        // Class diagram fields
         maHopdong: row.MaHopDong,
         maKH: row.MaKH,
         sodienthoaiKH: row.SoDienThoaiKH,
@@ -655,10 +666,14 @@ async function main() {
         giahopdong: Number(row.GiaHopDong),
         thoigiankiHDMB: kyDate,
         trangthaiHDMB: row.TrangThaiHDMB,
-        doanhso: Number(row.DoanhSo),
-        hoahong: Number(row.HoaHong),
+        // DoanhSo = GiaHopDong (hệ thống tự động ghi nhận)
+        doanhso: Number(row.GiaHopDong),
+        // DoanhThu = số tiền AHS thực tế thu được từ Chủ đầu tư (lấy đúng từ Excel)
+        doanhthu: row.DoanhThu == null || row.DoanhThu === '' ? null : Number(row.DoanhThu),
+        // HoaHong = lấy đúng từ Excel
+        hoahong: row.HoaHong == null || row.HoaHong === '' ? null : Number(row.HoaHong),
         trangthaiThanhtoan: row.TrangThaiThanhToan,
-        ghichu: `Hợp đồng mua bán chính thức CĐT - Mã KH ${row.MaKH}`
+        ghichu: row.GhiChu || `Hợp đồng mua bán chính thức CĐT - Mã KH ${row.MaKH}`
       }
     });
   }

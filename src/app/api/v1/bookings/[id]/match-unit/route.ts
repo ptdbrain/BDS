@@ -50,6 +50,27 @@ export async function POST(
       return NextResponse.json({ error: 'Không tìm thấy lượt booking' }, { status: 404 });
     }
 
+    if (!booking.depositConfirmedAt) {
+      return NextResponse.json({
+        error: 'Giao dịch booking chưa được Sales Admin xác nhận. Chưa được phép khớp căn.'
+      }, { status: 409 });
+    }
+
+    const now = new Date();
+
+    // Kiểm tra quy tắc nghiệp vụ: Tất cả booking phải chờ thời điểm ra hàng của dự án
+    // STT 1: từ thời điểm ra hàng (VD: 14h00) đến 14h10, STT 2: 14h10 đến 14h20, ...
+    if (!body.skipTimeCheck) {
+      if (booking.tgBatdaukhop && now.getTime() < new Date(booking.tgBatdaukhop).getTime()) {
+        const startH = String(new Date(booking.tgBatdaukhop).getHours()).padStart(2, '0');
+        const startM = String(new Date(booking.tgBatdaukhop).getMinutes()).padStart(2, '0');
+        const dayStr = `${String(new Date(booking.tgBatdaukhop).getDate()).padStart(2, '0')}/${String(new Date(booking.tgBatdaukhop).getMonth() + 1).padStart(2, '0')}`;
+        return NextResponse.json({
+          error: `Chưa tới thời điểm ra hàng hoặc chưa tới lượt khớp căn của Booking ${booking.maLuotBooking}! Khung giờ khớp căn: ${startH}h${startM} ngày ${dayStr}. Tất cả các lượt booking đều phải chờ đến giờ ra hàng!`
+        }, { status: 400 });
+      }
+    }
+
     // Kiểm tra căn hộ
     let product = await db.product.findUnique({
       where: { id: effectiveProductId },
@@ -84,7 +105,6 @@ export async function POST(
       }, { status: 409 });
     }
 
-    const now = new Date();
     const resolvedSalesId = salesEmployeeId || booking.salesEmployeeId;
 
     // Thực hiện atomic transaction: Đổi trạng thái căn sang ĐÃ BÁN, Booking sang ĐÃ KHỚP, tạo Hợp Đồng nháp
@@ -129,7 +149,6 @@ export async function POST(
 
       // 4. Khởi tạo Hợp Đồng Mua Bán (Chứa đầy đủ các trường của Lớp Sản Phẩm + Lớp Hợp Đồng)
       const basePrice = product.gianiemyet || product.giaTTC || product.prices[0]?.amount || 4800000000;
-      const commission = Math.round(basePrice * 0.03);
       const contractNumber = `HĐ-${product.productCode.replace(/[\.\-]/g, '')}-2026`;
 
       const paymentPlan = await tx.paymentPlan.findFirst({
@@ -147,8 +166,8 @@ export async function POST(
           dealRevenue: basePrice,
           status: 'DRAFT', // Chờ Sales điền đầy đủ và gửi duyệt
           signingStatus: 'CHUA_KY',
-          commissionStatus: 'DU_KIEN_TRA',
-          commissionAmount: commission,
+        commissionStatus: null,
+        commissionAmount: null,
           investorContractNo: contractNumber,
           investorNotes: `Hợp đồng khớp căn từ lượt Booking ${booking.maLuotBooking}`,
           // Class diagram fields
@@ -162,7 +181,7 @@ export async function POST(
           phuonganthanhtoan: 'Thanh toán chuẩn',
           giahopdong: basePrice,
           doanhso: basePrice,
-          hoahong: commission,
+          hoahong: null,
           trangthaiThanhtoan: 'Đã cọc 50M (Booking)',
           ghichu: `Khớp căn trong đợt mở bán từ lượt Booking ${booking.maLuotBooking}`
         },

@@ -117,7 +117,7 @@ async function main() {
   for (let i = 0; i < contracts.length; i++) {
     const ct = contracts[i];
     const revenue = ct.dealRevenue || ct.agreedPrice || 4800000000;
-    const commission = ct.commissionAmount || Math.round(revenue * 0.03);
+    const commission = ct.commissionAmount ?? null;
 
     await prisma.contract.update({
       where: { id: ct.id },
@@ -135,7 +135,7 @@ async function main() {
         trangthaiHDMB: ct.signingStatus || (ct.status === 'SIGNED' ? 'DA_KY' : 'CHUA_KY'),
         doanhso: revenue,
         hoahong: commission,
-        trangthaiThanhtoan: ct.commissionStatus || 'DU_KIEN_TRA',
+         trangthaiThanhtoan: ct.commissionStatus || null,
         ghichu: ct.investorNotes || 'Hợp đồng mua bán chính thức từ CĐT'
       }
     });

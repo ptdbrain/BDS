@@ -52,7 +52,10 @@ export function ComprehensiveContractModal({
     phuonganthanhtoan: 'Thanh toán chuẩn',
     giahopdong: 4800000000,
     doanhso: 4800000000,
-    hoahong: 144000000,
+    doanhthu: null as number | null,
+    hoahong: null as number | null,
+    commissionStatus: '',
+    commissionDueDate: '',
     trangthaiThanhtoan: 'Đã cọc thành công',
     ghichu: 'Hồ sơ giao dịch bất động sản'
   });
@@ -79,8 +82,11 @@ export function ComprehensiveContractModal({
         diachiKH: contract.diachiKH || cust?.addressCiphertext || 'Hà Nội',
         phuonganthanhtoan: contract.phuonganthanhtoan || 'Thanh toán chuẩn',
         giahopdong: Number(contract.giahopdong || basePrice),
-        doanhso: Number(contract.doanhso || basePrice),
-        hoahong: Number(contract.hoahong || Math.round(basePrice * 0.03)),
+        doanhso: Number(contract.doanhso || contract.giahopdong || basePrice),
+        doanhthu: contract.doanhthu == null ? null : Number(contract.doanhthu),
+        hoahong: contract.hoahong == null ? null : Number(contract.hoahong),
+        commissionStatus: contract.commissionStatus || '',
+        commissionDueDate: contract.commissionDueDate || '',
         trangthaiThanhtoan: contract.trangthaiThanhtoan || 'Đã cọc thành công',
         ghichu: contract.ghichu || contract.investorNotes || 'Giao dịch căn hộ chính thức'
       });
@@ -97,7 +103,10 @@ export function ComprehensiveContractModal({
         phuonganthanhtoan: 'Thanh toán chuẩn',
         giahopdong: Number(basePrice),
         doanhso: Number(basePrice),
-        hoahong: Math.round(Number(basePrice) * 0.03),
+        doanhthu: null,
+        hoahong: null,
+        commissionStatus: '',
+        commissionDueDate: '',
         trangthaiThanhtoan: 'Đã cọc thành công',
         ghichu: 'Hồ sơ giao dịch căn hộ ' + activeProduct.productCode
       });
@@ -116,13 +125,11 @@ export function ComprehensiveContractModal({
     } else {
       newPrice = activeProduct?.giaTTC || newPrice;
     }
-    const newComm = Math.round(newPrice * 0.03);
     setFormData((prev) => ({
       ...prev,
       phuonganthanhtoan: plan,
       giahopdong: newPrice,
-      doanhso: newPrice,
-      hoahong: newComm
+      doanhso: newPrice
     }));
   };
 
@@ -138,13 +145,22 @@ export function ComprehensiveContractModal({
     setErrorMessage(null);
     try {
       const contractId = contract?.id;
+      const {
+        doanhthu,
+        hoahong,
+        commissionStatus,
+        commissionDueDate,
+        trangthaiThanhtoan,
+        ...salesFormData
+      } = formData;
       const res = await fetch(contractId ? `/api/v1/contracts/${contractId}` : '/api/v1/contracts', {
         method: contractId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: activeProduct?.id,
           salesEmployeeId: currentUser?.id || 'NV001',
-          ...formData,
+          ...salesFormData,
+          actorRole: currentRole,
           status: 'PENDING_REVIEW', // Chờ Sales Admin duyệt
           productData: activeProduct
         })
@@ -184,6 +200,7 @@ export function ComprehensiveContractModal({
         body: JSON.stringify({
           reviewerId: currentUser?.id || 'NV007',
           reviewerName: currentUser?.fullName || 'Vũ Mai Phương (Sales Admin)',
+          actorRole: currentRole,
           reason: 'Thông tin hợp đồng và pháp lý khách hàng đầy đủ, chính xác.',
           contractData: contract ? { ...contract, ...formData } : formData,
           productData: activeProduct,
@@ -193,6 +210,27 @@ export function ComprehensiveContractModal({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Duyệt hợp đồng thất bại');
+
+      // Cập nhật ngay ahs_custom_products trong localStorage để đồng bộ ngay lập tức sang ĐÃ BÁN
+      if (typeof window !== 'undefined') {
+        const prodId = activeProduct?.id || contract?.productId;
+        const maCan = activeProduct?.maCan || activeProduct?.productCode;
+        try {
+          const saved = localStorage.getItem('ahs_custom_products');
+          if (saved) {
+            const list = JSON.parse(saved);
+            const updated = list.map((p: any) => {
+              if ((prodId && p.id === prodId) || (maCan && (p.maCan === maCan || p.productCode === maCan))) {
+                return { ...p, status: 'SOLD', trangthai: 'Đã bán' };
+              }
+              return p;
+            });
+            localStorage.setItem('ahs_custom_products', JSON.stringify(updated));
+          }
+        } catch (e) {
+          console.error('Error updating localStorage:', e);
+        }
+      }
 
       setSuccessMessage('Đã duyệt và ký hợp đồng thành công! Doanh số và hoa hồng đã được ghi nhận.');
       broadcastSync('CONTRACT_UPDATED');
@@ -257,7 +295,7 @@ export function ComprehensiveContractModal({
     const doc = new jsPDF();
     doc.setFontSize(16);
     doc.setTextColor(30, 58, 138);
-    doc.text('HO SO HOP DONG GIAO DICH BAT DONG SAN AHS', 20, 20);
+    doc.text('HO SO HOP DONG GIAO DICH BAT DONG SAN AHS PROPERTY', 20, 20);
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     doc.text(`Ma Hop Dong: ${formData.maHopdong}`, 20, 30);
@@ -287,7 +325,24 @@ export function ComprehensiveContractModal({
     doc.save(`HopDong_${formData.maHopdong}.pdf`);
   };
 
-  const isSalesAdmin = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER';
+  const isManager = currentRole === 'MANAGER';
+  const isSalesAdmin = currentRole === 'SALES_ADMIN';
+  const canReviewContract = isSalesAdmin || isManager;
+  const isSales = currentRole === 'SALES';
+  const isProductAdmin = currentRole === 'PRODUCT_ADMIN';
+
+  // Doanh thu thực tế AHS thu từ CĐT: CHỈ Ban Lãnh Đạo và Sales Admin được thao tác/xem
+  // NVKD và QL Sản Phẩm tuyệt đối không được xem doanh thu của công ty
+  const canViewCompanyRevenue = isManager || isSalesAdmin;
+
+  // Hoa hồng: NVKD được xem hoa hồng của chính mình
+  const isOwner = Boolean(contract) && (
+                  contract?.salesEmployee?.employeeCode === currentUser?.employeeCode ||
+                  contract?.salesEmployeeId === currentUser?.id ||
+                  false
+                );
+  const canViewCommission = isSalesAdmin || isManager || isOwner;
+
   const isChangeRequested = contract?.status === 'CHANGE_REQUESTED' || contract?.status === 'CHANGES_REQUESTED';
   const isApproved = contract?.status === 'SIGNED' || contract?.status === 'APPROVED' || contract?.signingStatus === 'DA_KY';
 
@@ -531,42 +586,120 @@ export function ComprehensiveContractModal({
                       ...formData,
                       giahopdong: v,
                       doanhso: v,
-                      hoahong: Math.round(v * 0.03)
+                      hoahong: formData.hoahong
                     });
                   }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-brand-400 font-bold outline-none"
                 />
               </div>
 
-              {/* Doanh số & Hoa hồng */}
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-slate-400 text-[10px] mb-1">Doanh Số [DoanhSo]</label>
-                  <div className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-emerald-400 font-bold">
-                    {Number(formData.doanhso).toLocaleString('vi-VN')} đ
-                  </div>
+              {/* 1. Doanh số: Tự động ghi nhận theo giá trị căn bán được theo hợp đồng */}
+              <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-emerald-300 font-bold text-xs">
+                    Doanh Số Bán Hàng [DoanhSo]
+                  </label>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-semibold">
+                    ✓ Hệ thống tự động ghi nhận theo HĐ
+                  </span>
                 </div>
-                <div>
-                  <label className="block text-slate-400 text-[10px] mb-1">Hoa Hồng (3%) [HoaHong]</label>
-                  <div className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-purple-400 font-bold">
-                    {Number(formData.hoahong).toLocaleString('vi-VN')} đ
-                  </div>
+                <div className="text-lg font-black text-emerald-400">
+                  {Number(formData.doanhso).toLocaleString('vi-VN')} VND
                 </div>
+                <p className="text-[10px] text-slate-400 mt-0.5">
+                  Doanh số = Giá trị căn bán được theo hợp đồng mua bán ({Number(formData.giahopdong).toLocaleString('vi-VN')} đ).
+                </p>
               </div>
+
+              {/* 2. Doanh thu: Số tiền AHS thực tế thu từ CĐT (Sales Admin nhập, chỉ Ban Lãnh Đạo xem) */}
+              {canViewCompanyRevenue ? (
+                <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-blue-300 font-bold text-xs flex items-center gap-1.5">
+                      <span>💵 Doanh Thu Thực Tế AHS Thu Từ CĐT [DoanhThu] (VND)</span>
+                    </label>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
+                      Chỉ Ban Lãnh Đạo xem báo cáo
+                    </span>
+                  </div>
+                  {isSalesAdmin ? (
+                    <input
+                      type="number"
+                      value={formData.doanhthu ?? ''}
+                      onChange={(e) => setFormData({ ...formData, doanhthu: Number(e.target.value) })}
+                      placeholder="Sales Admin nhập số tiền AHS thực tế thu từ CĐT..."
+                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400"
+                    />
+                  ) : (
+                    <div className="text-base font-black text-cyan-300">
+                      {formData.doanhthu == null ? 'Chưa cập nhật' : Number(formData.doanhthu).toLocaleString('vi-VN') + ' VND'}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-400">
+                    * Sales Admin nhập số tiền AHS thực tế thu về từ Chủ đầu tư (NVKD & QL sản phẩm không được xem).
+                  </p>
+                </div>
+              ) : null}
+
+              {/* 3. Hoa hồng: Sales Admin cập nhật; NVKD được xem hoa hồng của chính mình */}
+              {canViewCommission ? (
+                <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-purple-300 font-bold text-xs">
+                      🎁 Hoa Hồng NVKD [HoaHong] (VND)
+                    </label>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">
+                      {isSalesAdmin ? 'Sales Admin cập nhật' : 'Hoa hồng của bạn'}
+                    </span>
+                  </div>
+                  {isSalesAdmin ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={formData.hoahong ?? ''}
+                        onChange={(e) => setFormData({ ...formData, hoahong: Number(e.target.value) })}
+                        placeholder="Số tiền hoa hồng NVKD..."
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-purple-300 font-bold text-sm outline-none"
+                      />
+                      <select
+                        value={formData.commissionStatus}
+                        onChange={(e) => setFormData({ ...formData, commissionStatus: e.target.value })}
+                        className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-purple-200 font-semibold text-xs outline-none"
+                      >
+                        <option value="">-- Sales Admin cập nhật --</option>
+                        <option value="DU_KIEN_TRA">Dự kiến chi trả ({formData.commissionDueDate || 'chưa có ngày'})</option>
+                        <option value="DA_TRA">✓ Đã chi trả cho NVKD</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="text-lg font-black text-purple-400">
+                      {formData.hoahong == null ? 'Chưa cập nhật' : Number(formData.hoahong).toLocaleString('vi-VN') + ' VND'}
+                      <span className="text-xs text-slate-400 font-normal ml-2">
+                        ({formData.commissionStatus === 'DA_TRA' ? 'Đã chi trả' : `Dự kiến chi trả: ${formData.commissionDueDate}`})
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-800 text-xs text-slate-400 italic">
+                  🔒 Thông tin hoa hồng của nhân viên khác được bảo mật.
+                </div>
+              )}
 
               {/* Trạng thái thanh toán */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  Trạng Thái Thanh Toán [TrangThaiThanhToan]
+                  Trạng Thái Hoa Hồng [TrangThaiHoaHong]
                 </label>
                 <select
-                  value={formData.trangthaiThanhtoan}
-                  onChange={(e) => setFormData({ ...formData, trangthaiThanhtoan: e.target.value })}
+                  value={formData.commissionStatus}
+                  onChange={(e) => setFormData({ ...formData, commissionStatus: e.target.value })}
+                  disabled={!isSalesAdmin}
                   className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none"
                 >
-                  <option value="Đã cọc thành công">Đã cọc thành công</option>
-                  <option value="Đã thanh toán đợt 1">Đã thanh toán đợt 1</option>
-                  <option value="Hoàn tất">Hoàn tất thanh toán</option>
+                  <option value="">-- Chưa cập nhật --</option>
+                  <option value="DU_KIEN_TRA">Dự kiến chi trả</option>
+                  <option value="DA_TRA">Đã chi trả</option>
                 </select>
               </div>
 
@@ -623,7 +756,7 @@ export function ComprehensiveContractModal({
             )}
 
             {/* Sales Admin Actions */}
-            {isSalesAdmin && !isApproved && (
+            {canReviewContract && !isApproved && (
               <>
                 <button
                   type="button"

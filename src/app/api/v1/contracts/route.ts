@@ -4,10 +4,19 @@ import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { ensureProductExists } from '@/lib/productHelper';
+import { getAuthorizedFinancialFields, sanitizeContractForRole } from '@/lib/contractFinancialPolicy';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await ensureDatabaseSeeded();
+    const { searchParams } = new URL(request.url);
+    const role = (searchParams.get('role') || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    const employeeCode = searchParams.get('employeeCode') || request.headers.get('x-employee-code') || '';
+
+    const isManager = role === 'MANAGER';
+    const isSalesAdmin = role === 'SALES_ADMIN';
+    const isSales = role === 'SALES';
+
     const contracts = await db.contract.findMany({
       include: {
         product: { include: { project: true } },
@@ -19,7 +28,9 @@ export async function GET() {
       orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json({ data: contracts });
+    const sanitized = contracts.map(c => sanitizeContractForRole(c, role, employeeCode));
+
+    return NextResponse.json({ data: sanitized });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -28,6 +39,13 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    let financialFields: Record<string, unknown>;
+    try {
+      financialFields = getAuthorizedFinancialFields(actorRole, body);
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     const {
       productId,
       customerId,
@@ -143,8 +161,6 @@ export async function POST(request: Request) {
 
     // Resolve accurate agreed price / deal revenue
     const resolvedPrice = dealRevenue || agreedPrice || product.prices[0]?.amount || 4500000000;
-    const resolvedCommission = commissionAmount !== undefined ? commissionAmount : (resolvedPrice * 0.03);
-
     const validSalesId = await resolveEmployeeId(salesEmployeeId, 'SALES');
 
     // Check if contract exists for this product
@@ -168,9 +184,7 @@ export async function POST(request: Request) {
           signedDate: signedDate ? new Date(signedDate) : existingContract.signedDate,
           signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : existingContract.signedAt,
           status: requestedStatus || (signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW'),
-          commissionStatus: trangthaiThanhtoan || commissionStatus,
-          commissionDueDate: commissionDueDate || existingContract.commissionDueDate,
-          commissionAmount: Number(hoahong || resolvedCommission),
+          ...financialFields,
           investorContractNo: maHopdong || investorContractNo || existingContract.investorContractNo,
           investorNotes: ghichu || investorNotes || existingContract.investorNotes,
 
@@ -186,9 +200,7 @@ export async function POST(request: Request) {
           giahopdong: Number(giahopdong || resolvedPrice),
           thoigiankiHDMB: signedDate ? new Date(signedDate) : existingContract.signedDate,
           trangthaiHDMB: signingStatus,
-          doanhso: Number(doanhso || resolvedPrice),
-          hoahong: Number(hoahong || resolvedCommission),
-          trangthaiThanhtoan: trangthaiThanhtoan || commissionStatus,
+          doanhso: Number(doanhso || giahopdong || resolvedPrice),
           ghichu: ghichu || investorNotes || existingContract.investorNotes || 'Hợp đồng mua bán CĐT'
         },
         include: {
@@ -250,7 +262,7 @@ export async function POST(request: Request) {
       customerPhone: sodienthoaiKH || customer.phone,
       agreedPrice: Number(giahopdong || resolvedPrice),
       dealRevenue: Number(doanhso || resolvedPrice),
-      commissionAmount: Number(hoahong || resolvedCommission),
+       ...financialFields,
       createdAt: new Date().toISOString()
     };
 
@@ -268,9 +280,10 @@ export async function POST(request: Request) {
         signedDate: signedDate ? new Date(signedDate) : null,
         signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : null,
         status: requestedStatus || (signingStatus === 'DA_KY' ? 'SIGNED' : 'PENDING_REVIEW'),
-        commissionStatus: trangthaiThanhtoan || commissionStatus,
-        commissionDueDate: commissionDueDate || '25/10/2026',
-        commissionAmount: Number(hoahong || resolvedCommission),
+        commissionStatus: (financialFields.commissionStatus as string | null | undefined) ?? null,
+        commissionDueDate: (financialFields.commissionDueDate as string | null | undefined) ?? null,
+        commissionAmount: (financialFields.commissionAmount as number | null | undefined) ?? null,
+        ...financialFields,
         investorContractNo: maHopdong || investorContractNo || contractNumber,
         investorNotes: ghichu || investorNotes,
         snapshotJson: JSON.stringify(snapshot),
@@ -287,10 +300,8 @@ export async function POST(request: Request) {
         giahopdong: Number(giahopdong || resolvedPrice),
         thoigiankiHDMB: signedDate ? new Date(signedDate) : null,
         trangthaiHDMB: signingStatus,
-        doanhso: Number(doanhso || resolvedPrice),
-        hoahong: Number(hoahong || resolvedCommission),
-        trangthaiThanhtoan: trangthaiThanhtoan || commissionStatus,
-        ghichu: ghichu || investorNotes || 'Hợp đồng mua bán chính thức CĐT'
+        doanhso: Number(doanhso || giahopdong || resolvedPrice),
+       ghichu: ghichu || investorNotes || 'Hợp đồng mua bán chính thức CĐT'
       },
       include: {
         product: { include: { project: true } },

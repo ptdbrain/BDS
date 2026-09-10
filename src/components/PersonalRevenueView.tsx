@@ -90,11 +90,11 @@ export function PersonalRevenueView({
 
   const paidCommission = personalContracts
     .filter((c) => c.commissionStatus === 'DA_TRA')
-    .reduce((acc, c) => acc + (c.commissionAmount || (c.dealRevenue || c.agreedPrice || 0) * 0.03), 0);
+    .reduce((acc, c) => acc + Number(c.commissionAmount ?? c.hoahong ?? 0), 0);
 
   const pendingCommission = personalContracts
     .filter((c) => c.commissionStatus !== 'DA_TRA')
-    .reduce((acc, c) => acc + (c.commissionAmount || (c.dealRevenue || c.agreedPrice || 0) * 0.03), 0);
+    .reduce((acc, c) => acc + Number(c.commissionAmount ?? c.hoahong ?? 0), 0);
 
   const signedContractsCount = personalContracts.filter(
     (c) => c.signingStatus === 'DA_KY' || c.status === 'SIGNED'
@@ -243,9 +243,9 @@ export function PersonalRevenueView({
               ) : (
                 personalContracts.map((ct) => {
                   const signingStatus = ct.signingStatus || (ct.status === 'SIGNED' ? 'DA_KY' : 'CHUA_KY');
-                  const commissionStatus = ct.commissionStatus || 'DU_KIEN_TRA';
+                  const commissionStatus = ct.commissionStatus || '';
                   const revenue = ct.dealRevenue || ct.agreedPrice || 0;
-                  const commAmount = ct.commissionAmount || revenue * 0.03;
+                  const commAmount = ct.commissionAmount ?? ct.hoahong;
 
                   return (
                     <tr key={ct.id} className="hover:bg-slate-800/40 transition">
@@ -294,15 +294,17 @@ export function PersonalRevenueView({
                             <CheckCircle className="w-3.5 h-3.5" />
                             <span>Đã Trả</span>
                           </span>
-                        ) : (
+                        ) : commissionStatus === 'DU_KIEN_TRA' ? (
                           <span className="status-deposited px-2.5 py-1 rounded-full text-[11px] font-bold flex items-center gap-1 w-max">
                             <Clock className="w-3.5 h-3.5" />
-                            <span>Dự kiến: {ct.commissionDueDate || '25/10'}</span>
+                            <span>Dự kiến: {ct.commissionDueDate || 'chưa có ngày'}</span>
                           </span>
+                        ) : (
+                          <span className="text-xs text-slate-500 italic">Chưa cập nhật</span>
                         )}
                       </td>
                       <td className="p-3.5 font-bold text-amber-400">
-                        {Number(commAmount).toLocaleString('vi-VN')} VND
+                        {commAmount == null ? 'Chưa cập nhật' : Number(commAmount).toLocaleString('vi-VN') + ' VND'}
                       </td>
                     </tr>
                   );

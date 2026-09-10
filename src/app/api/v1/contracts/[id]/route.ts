@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { ensureContractExists } from '@/lib/contractHelper';
+import { getAuthorizedFinancialFields, sanitizeContractForRole } from '@/lib/contractFinancialPolicy';
 
 export async function GET(
   request: Request,
@@ -24,7 +25,10 @@ export async function GET(
       return NextResponse.json({ error: 'Không tìm thấy hợp đồng' }, { status: 404 });
     }
 
-    return NextResponse.json({ data: contract });
+    const { searchParams } = new URL(request.url);
+    const role = (searchParams.get('role') || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    const employeeCode = searchParams.get('employeeCode') || request.headers.get('x-employee-code') || '';
+    return NextResponse.json({ data: sanitizeContractForRole(contract, role, employeeCode) });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -36,6 +40,13 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    let financialFields: Record<string, unknown>;
+    try {
+      financialFields = getAuthorizedFinancialFields(actorRole, body);
+    } catch (error: any) {
+      return NextResponse.json({ error: error.message }, { status: 403 });
+    }
     const {
       // Contract fields
       investorContractNo,
@@ -122,23 +133,7 @@ export async function PATCH(
       dataToUpdate.doanhso = numRevenue;
     }
 
-    if (hoahong !== undefined) {
-      const numComm = parseFloat(String(hoahong));
-      dataToUpdate.hoahong = numComm;
-      dataToUpdate.commissionAmount = numComm;
-    } else if (commissionAmount !== undefined) {
-      const numComm = parseFloat(String(commissionAmount));
-      dataToUpdate.commissionAmount = numComm;
-      dataToUpdate.hoahong = numComm;
-    }
-
-    if (trangthaiThanhtoan !== undefined) {
-      dataToUpdate.trangthaiThanhtoan = trangthaiThanhtoan;
-      dataToUpdate.commissionStatus = trangthaiThanhtoan;
-    } else if (commissionStatus !== undefined) {
-      dataToUpdate.commissionStatus = commissionStatus;
-      dataToUpdate.trangthaiThanhtoan = commissionStatus;
-    }
+    Object.assign(dataToUpdate, financialFields);
 
     if (ghichu !== undefined) {
       dataToUpdate.ghichu = ghichu;

@@ -129,8 +129,6 @@ export async function POST(
 
       // 5. Automatically create or update Contract so BC_DoanhThu, BC_DoanhSo_NV, and Personal Revenue update in realtime
       const price = lock.product.gianiemyet || lock.product.giaTTC || lock.product.prices[0]?.amount || 4500000000;
-      const commission = Math.round(price * 0.03);
-
       let existingContract = await tx.contract.findFirst({
         where: { productId: lock.productId }
       });
@@ -145,11 +143,11 @@ export async function POST(
             dealRevenue: existingContract.dealRevenue || price,
             agreedPrice: existingContract.agreedPrice || price,
             salesEmployeeId: lock.salesEmployeeId || existingContract.salesEmployeeId,
-            commissionStatus: 'DU_KIEN_TRA',
-            commissionAmount: existingContract.commissionAmount || commission,
+            commissionStatus: existingContract.commissionStatus,
+            commissionAmount: existingContract.commissionAmount,
             trangthaiHDMB: 'Chưa ký',
             doanhso: existingContract.dealRevenue || price,
-            hoahong: existingContract.commissionAmount || commission,
+            hoahong: existingContract.hoahong,
             investorNotes: `Đã xác nhận tiền cọc. Chờ Nhân viên kinh doanh nhập thông tin khách hàng và hợp đồng.`
           }
         });
@@ -201,9 +199,9 @@ export async function POST(
             dealRevenue: price,
             status: 'DRAFT',
             signingStatus: 'CHUA_KY',
-            commissionStatus: 'DU_KIEN_TRA',
-            commissionDueDate: '25/10/2026',
-            commissionAmount: commission,
+            commissionStatus: null,
+            commissionDueDate: null,
+            commissionAmount: null,
             investorContractNo: contractNumber,
             investorNotes: `Đã xác nhận tiền cọc cho căn ${lock.product.productCode}. Chờ nhân viên kinh doanh nhập thông tin khách hàng theo biểu mẫu hợp đồng.`,
             maHopdong: String(202600 + contractCount + 1),
@@ -217,8 +215,8 @@ export async function POST(
             giahopdong: price,
             trangthaiHDMB: 'Chưa ký',
             doanhso: price,
-            hoahong: commission,
-            trangthaiThanhtoan: 'DU_KIEN_TRA',
+            hoahong: null,
+            trangthaiThanhtoan: null,
             ghichu: `Đã cọc 100M qua Sales Admin: ${actorName}. Chờ nhập thông tin hợp đồng.`
           }
         });

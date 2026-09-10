@@ -62,13 +62,13 @@ export const SSO_ACCOUNTS: SSOAccountConfig[] = [
   },
   {
     code: 'NV009',
-    fullName: 'Nguyễn Thùy Dương',
+    fullName: 'Hoàng Thị Hương Giang',
     jobTitle: 'Chuyên viên quản lý sản phẩm',
     departmentName: 'Phòng Quản lý sản phẩm',
     role: 'PRODUCT_ADMIN',
-    email: 'nv009@ahs.com.vn',
+    email: 'giang.hth@ahs.com.vn',
     phone: '0912.009.009',
-    avatarText: 'TD',
+    avatarText: 'HG',
     color: 'from-blue-500 to-cyan-500',
     badgeLabel: 'QL SẢN PHẨM & QUỸ HÀNG',
     badgeColor: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -93,12 +93,13 @@ export const SSO_ACCOUNTS: SSOAccountConfig[] = [
     color: 'from-purple-500 to-indigo-500',
     badgeLabel: 'SALES ADMIN (DUYỆT CỌC/KYC)',
     badgeColor: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    description: 'Xác nhận chuyển khoản cọc (chuyển căn từ Lock sang Đã Bán), kiểm duyệt hồ sơ KYC khách hàng và nhập HĐMB từ CĐT.',
+    description: 'Xác nhận giao dịch, kiểm duyệt hồ sơ KYC khách hàng, nhập Doanh Thu và cập nhật Hoa Hồng từ CĐT.',
     permissions: [
       'Kiểm tra & Xác nhận tiền chuyển khoản cọc',
-      'Chuyển trạng thái căn từ Lock sang Đã Bán',
+      'Xác nhận giao dịch và xếp lượt booking tiếp theo',
       'Kiểm duyệt KYC thông tin khách hàng',
-      'Nhập hợp đồng mua bán từ CĐT kèm doanh số & hoa hồng',
+      'Nhập DoanhThu, HoaHong và TrangThaiHoaHong',
+      'Không có quyền xem báo cáo doanh thu tổng hợp công ty',
       'Xuất danh sách khách hàng gửi Chủ đầu tư'
     ]
   },

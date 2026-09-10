@@ -31,17 +31,23 @@ interface CustomerManagerProps {
   currentRole: UserRole;
   currentUser?: any;
   onRefresh: () => void;
+  prefilledLock?: any;
+  autoOpenForm?: boolean;
+  onClearPrefilledLock?: () => void;
 }
 
 export function CustomerManager({
   customers,
   currentRole,
   currentUser,
-  onRefresh
+  onRefresh,
+  prefilledLock,
+  autoOpenForm,
+  onClearPrefilledLock
 }: CustomerManagerProps) {
   const [revealPII, setRevealPII] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(!!autoOpenForm || !!prefilledLock);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [selectedVerification, setSelectedVerification] = useState<any | null>(null);
 
@@ -60,6 +66,20 @@ export function CustomerManager({
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formError, setFormError] = useState<string>('');
   const [formSuccess, setFormSuccess] = useState<string>('');
+
+  // Auto open form and prefill data when redirected from Lock / Deposit payment
+  React.useEffect(() => {
+    if (autoOpenForm || prefilledLock) {
+      setIsFormOpen(true);
+      if (prefilledLock) {
+        setFormData((prev) => ({
+          ...prev,
+          fullName: prefilledLock.customerName || prev.fullName,
+          phone: prefilledLock.customerPhone || prev.phone,
+        }));
+      }
+    }
+  }, [autoOpenForm, prefilledLock]);
 
   // Change request state
   const [changeReason, setChangeReason] = useState<string>('');
@@ -101,7 +121,11 @@ export function CustomerManager({
           body: JSON.stringify({
             ...formData,
             actorId: currentUser?.id || 'NV001',
-            actorName: currentUser?.fullName || 'Nguyễn Minh Khôi'
+            actorName: currentUser?.fullName || 'Nguyễn Minh Khôi',
+            lockId: prefilledLock?.id,
+            productId: prefilledLock?.productId || prefilledLock?.product?.id,
+            productCode: prefilledLock?.product?.productCode || prefilledLock?.productCode,
+            productData: prefilledLock?.product
           })
         });
         const data = await res.json();
@@ -130,8 +154,12 @@ export function CustomerManager({
       });
       setEditingCustomerId(null);
       setIsFormOpen(false);
+      if (onClearPrefilledLock) {
+        onClearPrefilledLock();
+      }
       onRefresh();
       broadcastSync('CUSTOMER_UPDATED');
+      broadcastSync('ALL_DATA_UPDATED');
     } catch (err: any) {
       setFormError(err.message);
     }
@@ -350,6 +378,44 @@ export function CustomerManager({
             </h3>
             <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-white">✕</button>
           </div>
+
+          {prefilledLock && (
+            <div className="p-4 rounded-xl bg-gradient-to-r from-brand-950/70 via-slate-900 to-emerald-950/50 border-2 border-brand-500/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl animate-in fade-in">
+              <div className="flex items-center space-x-3.5">
+                <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shrink-0">
+                  <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-brand-400">
+                      Gắn Liền Với Căn Vừa Đặt Cọc
+                    </span>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                      ĐÃ XÁC NHẬN CỌC 100.000.000 VNĐ
+                    </span>
+                  </div>
+                  <p className="text-sm font-black text-white mt-0.5">
+                    Căn {prefilledLock.product?.productCode || prefilledLock.productCode || 'Đang chọn'}
+                    {prefilledLock.product?.building ? ` • Tòa ${prefilledLock.product.building}` : ''}
+                    {prefilledLock.product?.projectName ? ` • ${prefilledLock.product.projectName}` : ''}
+                  </p>
+                  <p className="text-[11px] text-slate-300 mt-0.5">
+                    Hồ sơ khách hàng này sẽ được tự động liên kết vào lượt giữ căn và khởi tạo hợp đồng để Sales Admin phê duyệt.
+                  </p>
+                </div>
+              </div>
+
+              {onClearPrefilledLock && (
+                <button
+                  type="button"
+                  onClick={() => onClearPrefilledLock()}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition shrink-0"
+                >
+                  Bỏ liên kết căn
+                </button>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSaveCustomer} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">

@@ -102,19 +102,20 @@ export async function POST(request: Request) {
     }
 
     const now = new Date();
-    // Quy tắc khớp căn tuần tự 10 phút:
-    // STT 1: bắt đầu lúc 09h10, kết thúc 09h20
-    // STT 2: bắt đầu sau khi STT 1 kết thúc -> 09h20, kết thúc 09h30
-    // STT k: bắt đầu lúc STT(k-1).tgKetthuckhopcan, kết thúc sau 10 phút
+    // Quy tắc khớp căn tuần tự 10 phút tính từ thời điểm ra hàng của Dự án:
+    // Mặc định: 14h00 chiều ngày 11/09/2026
+    // Lượt 1: bắt đầu lúc 14h00, kết thúc 14h10
+    // Lượt 2: bắt đầu sau khi Lượt 1 kết thúc -> 14h10, kết thúc 14h20
+    // Lượt k: bắt đầu lúc Lượt (k-1).tgKetthuckhopcan, kết thúc sau 10 phút
+    const projectLaunchTime = project.saleOpenAt ? new Date(project.saleOpenAt) : new Date(2026, 8, 11, 14, 0, 0);
+
     let defaultStartMatch: Date;
     if (tgBatdaukhop) {
       defaultStartMatch = new Date(tgBatdaukhop);
     } else if (lastBooking?.tgKetthuckhopcan) {
       defaultStartMatch = new Date(lastBooking.tgKetthuckhopcan);
     } else {
-      const baseStart = new Date(now);
-      baseStart.setHours(9, 10, 0, 0);
-      defaultStartMatch = baseStart;
+      defaultStartMatch = projectLaunchTime;
     }
 
     const defaultEndMatch = tgKetthuckhopcan
@@ -125,6 +126,13 @@ export async function POST(request: Request) {
     const startM = String(defaultStartMatch.getMinutes()).padStart(2, '0');
     const endH = String(defaultEndMatch.getHours()).padStart(2, '0');
     const endM = String(defaultEndMatch.getMinutes()).padStart(2, '0');
+    const dayStr = `${String(defaultStartMatch.getDate()).padStart(2, '0')}/${String(defaultStartMatch.getMonth() + 1).padStart(2, '0')}`;
+
+    // Nếu thời điểm hiện tại chưa tới lượt, trạng thái không thể là DANG_KHOP
+    let computedTrangThai = trangthaikhopcan || 'CHO_KHOP';
+    if (now.getTime() < defaultStartMatch.getTime() && computedTrangThai === 'DANG_KHOP') {
+      computedTrangThai = 'CHO_KHOP';
+    }
 
     const booking = await db.booking.create({
       data: {
@@ -135,11 +143,11 @@ export async function POST(request: Request) {
         tgBooking: now,
         tgBatdaukhop: defaultStartMatch,
         tgKetthuckhopcan: defaultEndMatch,
-        trangthaikhopcan,
+        trangthaikhopcan: computedTrangThai,
         customerName: customerName || `Khách hàng Ưu tiên #${nextStt}`,
         customerPhone: customerPhone || '0988888888',
         depositAmount: parseFloat(String(depositAmount)),
-        notes: notes || `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (STT #${nextStt})`
+        notes: notes || `Khớp căn 10 phút: ${startH}h${startM} - ${endH}h${endM} (${dayStr}) (STT #${nextStt})`
       },
       include: {
         project: true,

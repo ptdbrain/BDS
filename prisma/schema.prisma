@@ -164,6 +164,9 @@ model Booking {
   customerPhone    String?
   depositAmount    Float?    @default(50000000)
   notes            String?
+  depositConfirmedAt DateTime?
+  depositConfirmedById String?
+  followUpBookingId String? @unique
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 }
@@ -295,6 +298,7 @@ model Contract {
   thoigiankiHDMB     DateTime?
   trangthaiHDMB      String?
   doanhso            Float?
+  doanhthu           Float?           // Doanh thu thực tế AHS thu được từ Chủ đầu tư (Sales Admin nhập, chỉ Ban Lãnh Đạo xem)
   hoahong            Float?
   trangthaiThanhtoan String?
   ghichu             String?

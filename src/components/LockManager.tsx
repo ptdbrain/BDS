@@ -22,7 +22,8 @@ import {
   User,
   Phone,
   Check,
-  PlusCircle
+  PlusCircle,
+  UserCheck
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
@@ -159,6 +160,7 @@ export function LockManager({
     setIsConfirmingPaymentSales(true);
     setActionSuccessMsg(null);
     try {
+      const targetLock = locks.find(l => l.id === lockId) || selectedLockForQR;
       const res = await fetch(`/api/v1/locks/${lockId}/confirm-payment-sales`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,6 +181,11 @@ export function LockManager({
       setSelectedLockForQR(null);
       onRefresh();
       broadcastSync('ALL_DATA_UPDATED');
+
+      // Tự động mở bảng khai báo thông tin khách hàng ngay lập tức cho NVKD
+      if (onProceedToCustomer && targetLock) {
+        onProceedToCustomer(targetLock);
+      }
     } catch (err: any) {
       alert(err.message || 'Lỗi kết nối máy chủ');
     } finally {
@@ -239,6 +246,27 @@ export function LockManager({
         return;
       }
 
+      // Cập nhật ngay ahs_custom_products trong localStorage để đồng bộ tức thì không bị ghi đè
+      if (typeof window !== 'undefined') {
+        const prodId = lockObj?.product?.id || lockObj?.productId || data?.product?.id;
+        const maCan = lockObj?.product?.maCan || lockObj?.product?.productCode;
+        try {
+          const saved = localStorage.getItem('ahs_custom_products');
+          if (saved) {
+            const list = JSON.parse(saved);
+            const updated = list.map((p: any) => {
+              if ((prodId && p.id === prodId) || (maCan && (p.maCan === maCan || p.productCode === maCan))) {
+                return { ...p, status: 'SOLD', trangthai: 'Đã bán' };
+              }
+              return p;
+            });
+            localStorage.setItem('ahs_custom_products', JSON.stringify(updated));
+          }
+        } catch (e) {
+          console.error('Error updating ahs_custom_products in localStorage:', e);
+        }
+      }
+
       setActionSuccessMsg(data.message || 'Xác nhận thành công! Căn đã chuyển trạng thái sang ĐÃ BÁN.');
       onRefresh();
       broadcastSync('ALL_DATA_UPDATED');
@@ -273,7 +301,7 @@ export function LockManager({
         return;
       }
 
-      // Update localStorage custom bookings if exists
+      // Cập nhật localStorage với lượt hiện tại và lượt kế tiếp do server tạo.
       try {
         const stored = localStorage.getItem('ahs_custom_bookings');
         if (stored) {
@@ -282,16 +310,18 @@ export function LockManager({
           if (idx >= 0) {
             customList[idx] = {
               ...customList[idx],
-              trangthaikhopcan: 'DANG_KHOP',
-              tgBatdaukhop: new Date(),
-              tgKetthuckhopcan: new Date(Date.now() + 10 * 60 * 1000)
+              trangthaikhopcan: 'CHO_KHOP'
             };
-            localStorage.setItem('ahs_custom_bookings', JSON.stringify(customList));
           }
+          const nextBooking = data?.data?.nextBooking;
+          if (nextBooking && !customList.some((b: any) => b.id === nextBooking.id || b.maLuotBooking === nextBooking.maLuotBooking)) {
+            customList.unshift(nextBooking);
+          }
+          localStorage.setItem('ahs_custom_bookings', JSON.stringify(customList));
         }
       } catch (e) {}
 
-      setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Khung giờ khớp căn (10 phút) đã được kích hoạt cho Sales.');
+      setActionSuccessMsg('Đã xác nhận thanh toán cọc 50.000.000 VNĐ thành công! Lượt booking đã được xếp vào hàng đợi khớp căn theo thứ tự.');
       onRefresh();
       broadcastSync('BOOKING_UPDATED');
       broadcastSync('ALL_DATA_UPDATED');
@@ -411,7 +441,7 @@ export function LockManager({
                   </span>
                 </h3>
                 <p className="text-xs text-amber-300/80">
-                  NVKD đã xác nhận khách thanh toán cọc. Sales Admin nhấn duyệt để kích hoạt <strong className="text-white">10 PHÚT KHỚP CĂN</strong>!
+                NVKD đã xác nhận khách thanh toán cọc. Sales Admin nhấn xác nhận để định lịch khung giờ khớp căn theo thứ tự hàng đợi..
                 </p>
               </div>
             </div>
@@ -461,14 +491,14 @@ export function LockManager({
                 </div>
 
                 <div className="pt-2 border-t border-slate-800">
-                  {currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? (
+                  {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt ? (
                     <button
                       onClick={() => handleApproveBooking(b.id)}
                       disabled={isApprovingBooking === b.id}
                       className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition disabled:opacity-50"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      <span>{isApprovingBooking === b.id ? 'Đang duyệt...' : 'Xác Nhận Đã Nhận Cọc ➔ Kích Hoạt 10 Phút'}</span>
+                      <span>{isApprovingBooking === b.id ? 'Đang xác nhận...' : 'Xác Nhận Đã Nhận Cọc → Xếp Lượt Tiếp Theo'}</span>
                     </button>
                   ) : (
                     <div className="py-2 px-3 rounded-xl bg-slate-800/80 text-center text-slate-400 text-xs font-semibold flex items-center justify-center space-x-1.5">
@@ -623,7 +653,7 @@ export function LockManager({
                         className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition"
                       >
                         <CheckCircle className="w-4 h-4" />
-                        <span>{isConfirmingTransfer === lock.id ? 'Đang cập nhật...' : 'Xác Nhận Đã Nhận Chuyển Khoản → Đã Bán'}</span>
+                        <span>{isConfirmingTransfer === lock.id ? 'Đang cập nhật...' : 'Xác Nhận Đã Nhận Chuyển Khoản → Đã bán'}</span>
                       </button>
 
                       <div className="flex items-center space-x-2">
@@ -647,9 +677,18 @@ export function LockManager({
                     // SALES & OTHER: Standard Sales Action Buttons
                     <div className="space-y-2 pt-2">
                       {lock.status === 'PAYMENT_PENDING' ? (
-                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center text-amber-300 font-bold text-xs flex items-center justify-center space-x-1.5 animate-pulse">
-                          <Clock className="w-4 h-4" />
-                          <span>Đã Gửi Xác Nhận Cọc 100M (Chờ Admin Duyệt)</span>
+                        <div className="space-y-2">
+                          <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-center text-amber-300 font-bold text-xs flex items-center justify-center space-x-1.5 animate-pulse">
+                            <Clock className="w-4 h-4" />
+                            <span>Đã Gửi Xác Nhận Cọc 100M (Chờ Admin Duyệt)</span>
+                          </div>
+                          <button
+                            onClick={() => onProceedToCustomer && onProceedToCustomer(lock)}
+                            className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-black uppercase flex items-center justify-center space-x-2 shadow-lg transition shadow-emerald-500/20"
+                          >
+                            <UserCheck className="w-4 h-4" />
+                            <span>📋 Khai Báo / Xem Thông Tin Khách Hàng ➔</span>
+                          </button>
                         </div>
                       ) : (
                         <button
@@ -875,7 +914,7 @@ export function LockManager({
                             <span>Sửa TT Booking</span>
                           </button>
 
-                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPending && (
+                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt && (
                             <button
                               onClick={() => handleApproveBooking(b.id)}
                               disabled={isApprovingBooking === b.id}
@@ -951,6 +990,20 @@ export function LockManager({
                 >
                   <CheckCircle className="w-4 h-4" />
                   <span>{isConfirmingPaymentSales ? 'Đang gửi...' : 'Nhân Viên KD: Xác Nhận Khách Đã Nộp Cọc 100M'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    const lock = selectedLockForQR;
+                    setSelectedLockForQR(null);
+                    if (onProceedToCustomer && lock) {
+                      onProceedToCustomer(lock);
+                    }
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 font-bold text-xs flex items-center justify-center space-x-1.5 transition"
+                >
+                  <UserCheck className="w-4 h-4 text-brand-600" />
+                  <span>📋 Điền Thông Tin Khách Hàng Cho Căn Này →</span>
                 </button>
               </div>
 

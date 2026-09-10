@@ -89,7 +89,11 @@ export async function ensureContractExists(contractData: any, productData?: any)
   }) || await db.paymentPlan.findFirst();
 
   const price = Number(contractData?.giahopdong || contractData?.dealRevenue || contractData?.agreedPrice || product.gianiemyet || (product as any).prices?.[0]?.amount || 4800000000);
-  const commission = Number(contractData?.hoahong || contractData?.commissionAmount || Math.round(price * 0.03));
+  const commission = contractData?.hoahong != null
+    ? Number(contractData.hoahong)
+    : contractData?.commissionAmount != null
+    ? Number(contractData.commissionAmount)
+    : null;
   const finalContractNumber = targetNumber || `HD-${product.productCode.replace(/[\.\-]/g, '')}-2026`;
 
   try {
@@ -105,7 +109,7 @@ export async function ensureContractExists(contractData: any, productData?: any)
         dealRevenue: price,
         status: contractData?.status || 'PENDING_REVIEW',
         signingStatus: contractData?.signingStatus || 'CHUA_KY',
-        commissionStatus: contractData?.commissionStatus || 'DU_KIEN_TRA',
+        commissionStatus: contractData?.commissionStatus ?? null,
         commissionAmount: commission,
         investorContractNo: finalContractNumber,
         investorNotes: contractData?.investorNotes || '',

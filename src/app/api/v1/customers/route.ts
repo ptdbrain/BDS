@@ -150,6 +150,9 @@ export async function POST(request: Request) {
       contactAddress,
       address,
       lockId,
+      productId,
+      productCode,
+      productData,
       actorId = 'emp_sales_01',
       actorName = 'Trần Văn Nam'
     } = body;
@@ -158,20 +161,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Họ tên, SĐT và CCCD là bắt buộc' }, { status: 400 });
     }
 
-    // Precondition Validation: Customer must be associated with an active lock or deposit transaction
+    // Resolve lock or product if provided
+    let lock: any = null;
     if (lockId) {
-      const lock = await db.productLock.findUnique({
-        where: { id: lockId }
+      lock = await db.productLock.findUnique({
+        where: { id: lockId },
+        include: { product: true }
       });
-      if (!lock) {
-        return NextResponse.json({
-          type: 'urn:ahs:problem:lock-not-found',
-          title: 'Không tìm thấy giao dịch giữ căn',
-          status: 400,
-          code: 'LOCK_NOT_FOUND',
-          detail: 'Thông tin khách hàng phải gắn liền với một giao dịch giữ căn/cọc hợp lệ.'
-        }, { status: 400 });
-      }
+    }
+    if (!lock && productId) {
+      lock = await db.productLock.findFirst({
+        where: { productId },
+        orderBy: { createdAt: 'desc' },
+        include: { product: true }
+      });
+    }
+
+    const effProductId = lock?.productId || productId;
+    let targetProduct = lock?.product;
+    if (!targetProduct && effProductId) {
+      targetProduct = await db.product.findUnique({ where: { id: effProductId } });
     }
 
     const cccdHash = hashPII(cccd.trim());
@@ -245,7 +254,7 @@ export async function POST(request: Request) {
         where: { id: verification.id },
         data: {
           submittedById: validActorId,
-          notes: lockId ? `Khai báo cập nhật gắn với lockId: ${lockId}` : 'Khai báo cập nhật thông tin khách hàng'
+          notes: lock ? `Khai báo cập nhật gắn với lockId: ${lock.id}` : 'Khai báo cập nhật thông tin khách hàng'
         }
       });
     } else {
@@ -254,9 +263,93 @@ export async function POST(request: Request) {
           customerId: customer.id,
           submittedById: validActorId,
           status: 'PENDING',
-          notes: lockId ? `Khai báo thông tin khách gắn với giao dịch cọc lockId: ${lockId}` : 'Khai báo thông tin khách mới'
+          notes: lock ? `Khai báo thông tin khách gắn với giao dịch cọc lockId: ${lock.id}` : 'Khai báo thông tin khách mới'
         }
       });
+    }
+
+    // Link customer to draft contract if associated with a unit/lock
+    if (effProductId && targetProduct) {
+      let existingContract = await db.contract.findFirst({
+        where: {
+          OR: [
+            ...(lock ? [{ lockId: lock.id }] : []),
+            { productId: effProductId }
+          ]
+        }
+      });
+
+      const agreedPrice = targetProduct.gianiemyet || targetProduct.giaTTC || 4550000000;
+      const now = new Date();
+
+      if (existingContract) {
+        await db.contract.update({
+          where: { id: existingContract.id },
+          data: {
+            customerId: customer.id,
+            salesEmployeeId: validActorId,
+            ...(lock ? { lockId: lock.id } : {}),
+            hotenKH: customer.fullName,
+            sodienthoaiKH: customer.phone,
+            cccdKH: cccd.trim(),
+            emailKH: customer.email || '',
+            diachiKH: contAddr,
+            status: existingContract.status === 'SIGNED' ? 'SIGNED' : 'PENDING_REVIEW',
+            signingStatus: existingContract.signingStatus === 'DA_KY' ? 'DA_KY' : 'CHUA_KY'
+          }
+        });
+      } else {
+        const contractCount = await db.contract.count();
+        const rand = Math.floor(Math.random() * 8999 + 1000);
+        const contractNumber = `HĐMB-AHS-${(targetProduct.productCode || 'CAN').replace(/[^a-zA-Z0-9]/g, '')}-${now.getFullYear()}-${rand}`;
+
+        let paymentPlan = await db.paymentPlan.findFirst({
+          where: { projectId: targetProduct.projectId }
+        }) || await db.paymentPlan.findFirst();
+
+        if (!paymentPlan) {
+          paymentPlan = await db.paymentPlan.create({
+            data: {
+              projectId: targetProduct.projectId || 'prj_grand_horizon',
+              code: 'STANDARD_PROGRESS',
+              name: 'Tiến độ chuẩn 7 đợt (Giá TTC)',
+              scheduleJson: JSON.stringify({ description: 'Thanh toán chuẩn theo tiến độ xây dựng' }),
+              active: true
+            }
+          });
+        }
+
+        await db.contract.create({
+          data: {
+            contractNumber,
+            productId: effProductId,
+            customerId: customer.id,
+            salesEmployeeId: validActorId,
+            lockId: lock?.id,
+            paymentPlanId: paymentPlan.id,
+            status: 'PENDING_REVIEW',
+            signingStatus: 'CHUA_KY',
+            agreedPrice,
+            dealRevenue: agreedPrice,
+            commissionAmount: null,
+            commissionStatus: null,
+            investorContractNo: contractNumber,
+            investorNotes: `Hồ sơ khách hàng vừa được Sales (${actorName}) nhập liệu sau khi nộp cọc. Chờ Sales Admin duyệt.`,
+            maHopdong: String(202600 + contractCount + 1),
+            maKH: String(1000 + contractCount + 1),
+            sodienthoaiKH: customer.phone,
+            cccdKH: cccd.trim(),
+            emailKH: customer.email || '',
+            diachiKH: contAddr,
+            hotenKH: customer.fullName,
+            giahopdong: agreedPrice,
+            trangthaiHDMB: 'Chưa ký',
+            doanhso: agreedPrice,
+            hoahong: null,
+            ghichu: `Khách hàng: ${customer.fullName} - Cọc căn ${targetProduct.productCode}`
+          }
+        });
+      }
     }
 
     await db.customer.update({

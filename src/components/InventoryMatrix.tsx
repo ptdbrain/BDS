@@ -28,7 +28,9 @@ import {
   Copy,
   Zap,
   ArrowRight,
-  Edit
+  Edit,
+  RotateCcw,
+  Play
 } from 'lucide-react';
 
 import { ProjectInfoView } from '@/components/ProjectInfoView';
@@ -36,6 +38,7 @@ import { AddProductModal } from '@/components/AddProductModal';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 import { BookingModal } from '@/components/BookingModal';
 import { broadcastSync, onSync } from '@/lib/sync';
+import { getCanonicalProductLabel } from '@/lib/productStatus';
 
 interface InventoryMatrixProps {
   products: any[];
@@ -286,12 +289,73 @@ export function InventoryMatrix({
     }
   };
 
+  // Launch time states & helpers
+  const [isSchedulingLaunch, setIsSchedulingLaunch] = useState(false);
+  const [customLaunchInput, setCustomLaunchInput] = useState('');
+
+  // Project launch time (Default: 14:00 11/09/2026 as per user specification)
+  const projectLaunchTime = selectedProject?.saleOpenAt
+    ? new Date(selectedProject.saleOpenAt)
+    : new Date(2026, 8, 11, 14, 0, 0);
+
+  const isWaitingForLaunch = nowTime < projectLaunchTime.getTime();
+
+  const getLaunchCountdown = (target: Date) => {
+    const diff = target.getTime() - nowTime;
+    if (diff <= 0) return '00:00:00';
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    if (days > 0) {
+      return `${days} ngày ${hours}h ${minutes}p ${seconds}s`;
+    }
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  // API Call to configure / simulate project launch schedule
+  const handleScheduleLaunch = async (customDateIso?: string) => {
+    if (!selectedProjectId) {
+      alert('Vui lòng chọn một dự án!');
+      return;
+    }
+    setIsSchedulingLaunch(true);
+    try {
+      const res = await fetch(`/api/v1/projects/${selectedProjectId}/schedule-launch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          saleOpenAt: customDateIso,
+          actorId: currentUser?.id || 'emp_prod_01',
+          actorName: currentUser?.fullName || 'Quản lý Sản phẩm'
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Cập nhật lịch ra hàng thất bại');
+        return;
+      }
+      await fetchBookings();
+      onRefresh();
+      broadcastSync('ALL_DATA_UPDATED');
+      alert(data.message || 'Thiết lập thời điểm ra hàng thành công!');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi thiết lập lịch ra hàng');
+    } finally {
+      setIsSchedulingLaunch(false);
+    }
+  };
+
   // Active matching booking (status DANG_KHOP and within 10-minute window)
-  const activeMatchingBooking = bookings.find((b) => {
-    if (b.trangthaikhopcan !== 'DANG_KHOP') return false;
-    if (!b.tgKetthuckhopcan) return false;
-    return new Date(b.tgKetthuckhopcan).getTime() > nowTime;
-  });
+  // Quy tắc: Nếu chưa tới giờ ra hàng (isWaitingForLaunch), không có lượt booking nào được khớp căn!
+  const activeMatchingBooking = !isWaitingForLaunch ? bookings.find((b) => {
+    if (!b.depositConfirmedAt) return false;
+    if (b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp') return false;
+    if (!b.tgBatdaukhop || !b.tgKetthuckhopcan) return false;
+    const start = new Date(b.tgBatdaukhop).getTime();
+    const end = new Date(b.tgKetthuckhopcan).getTime();
+    return (b.trangthaikhopcan === 'DANG_KHOP' || (nowTime >= start && nowTime <= end)) && end > nowTime;
+  }) : null;
 
   // Pending booking waiting for deposit confirmation in this project
   const pendingBookingInProject = bookings.find((b) =>
@@ -309,12 +373,24 @@ export function InventoryMatrix({
   // Buildings list
   const buildings = Array.from(new Set(products.map(p => p.building)));
 
+  // Helper: Check if a product is SOLD (either by status or linked to a signed/approved contract)
+  const isProductSold = (prod: any) => {
+    if (!prod) return false;
+    if (prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc') {
+      return true;
+    }
+    return contracts.some((c: any) =>
+      (c.productId === prod.id || c.product?.id === prod.id || c.maCan === prod.maCan || c.productCode === prod.productCode || c.product?.maCan === prod.maCan || (prod.productCode && c.maCan === prod.productCode)) &&
+      (c.status === 'SIGNED' || c.status === 'APPROVED' || c.signingStatus === 'DA_KY' || c.trangthaiHDMB === 'Đã ký')
+    );
+  };
+
   // Filter products (Đã cọc = Đã bán theo quy định AHS)
   const filteredProducts = products.filter(p => {
     if (buildingFilter !== 'ALL' && p.building !== buildingFilter) return false;
     
     if (statusFilter !== 'ALL') {
-      const isSold = p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc';
+      const isSold = isProductSold(p);
       const isLocked = (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') && !isSold;
       const isAvailable = (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng' || p.trangthai === 'Check Admin') && !isSold && !isLocked;
       const isUnavailable = p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn';
@@ -333,18 +409,15 @@ export function InventoryMatrix({
   });
 
   // Calculate status counts (Đã cọc = Đã bán theo nghiệp vụ)
-  const soldUnitsCount = products.filter(
-    p => p.status === 'SOLD' || p.status === 'DEPOSITED' || p.trangthai === 'Đã bán' || p.trangthai === 'Đã cọc'
-  ).length;
+  const soldUnitsCount = products.filter(p => isProductSold(p)).length;
 
   const lockedUnitsCount = products.filter(
-    p => (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') &&
-         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc'
+    p => (p.status === 'LOCKED' || p.trangthai === 'Đã khớp') && !isProductSold(p)
   ).length;
 
   const availableUnitsCount = products.filter(
     p => (p.status === 'AVAILABLE' || p.trangthai === 'Còn hàng' || p.trangthai === 'Check Admin') &&
-         p.status !== 'SOLD' && p.status !== 'DEPOSITED' && p.trangthai !== 'Đã bán' && p.trangthai !== 'Đã cọc' && p.trangthai !== 'Đã khớp' && p.status !== 'LOCKED'
+         !isProductSold(p) && p.trangthai !== 'Đã khớp' && p.status !== 'LOCKED'
   ).length;
 
   const counts = {
@@ -355,20 +428,18 @@ export function InventoryMatrix({
     UNAVAILABLE: products.filter(p => p.status === 'UNAVAILABLE' || p.trangthai === 'CDT thu căn').length,
   };
 
-  const getStatusBadge = (status: string, trangthai?: string | null) => {
-    if (status === 'SOLD' || status === 'DEPOSITED' || trangthai === 'Đã bán' || trangthai === 'Đã cọc') {
-      return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã Bán</span>;
+  const getStatusBadge = (status: string, trangthai?: string | null, isSoldOverride?: boolean) => {
+    const label = isSoldOverride ? 'Đã bán' : getCanonicalProductLabel(status, trangthai);
+    if (label === 'Đã bán') {
+      return <span className="status-sold px-2.5 py-1 rounded-full text-[11px] font-bold">Đã bán</span>;
     }
-    if (status === 'LOCKED' || trangthai === 'Đã khớp') {
-      return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang Lock 30m</span>;
+    if (label === 'Đang lock') {
+      return <span className="status-locked px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse-glow flex items-center gap-1"><Lock className="w-3 h-3" /> Đang lock</span>;
     }
-    if (trangthai === 'Check Admin') {
-      return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">Check Admin</span>;
+    if (label === 'Còn hàng') {
+      return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn hàng</span>;
     }
-    if (status === 'AVAILABLE' || trangthai === 'Còn hàng') {
-      return <span className="status-available px-2.5 py-1 rounded-full text-[11px] font-bold">Còn Hàng</span>;
-    }
-    return <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">Tạm Ngưng</span>;
+    return <span className="status-unavailable px-2.5 py-1 rounded-full text-[11px] font-bold">Tạm ngưng</span>;
   };
 
   // Group products by building and floor for matrix view
@@ -425,7 +496,7 @@ export function InventoryMatrix({
               >
                 <option value="ALL">Tất cả Trạng Thái</option>
                 <option value="AVAILABLE">Còn Hàng</option>
-                <option value="LOCKED">Đang Lock 30m</option>
+                <option value="LOCKED">Đang Lock</option>
                 <option value="SOLD">Đã Bán</option>
               </select>
             )}
@@ -601,6 +672,59 @@ export function InventoryMatrix({
             </div>
           </div>
 
+          {/* Official Launch Event Schedule & Simulator Controller */}
+          <div className="glass-panel p-5 rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-950 shadow-2xl relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="flex items-center space-x-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-amber-500 text-slate-950 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Lịch Ra Hàng Mở Bán Dự Án</span>
+                  </span>
+                  {isWaitingForLaunch ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                      ⏳ Đang Chờ Ra Hàng ({getLaunchCountdown(projectLaunchTime)})
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
+                      <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>⚡ Đang Mở Bán / Khớp Căn Trực Tiếp</span>
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-base font-black text-white">
+                  Thời điểm ra hàng: <span className="text-amber-300 font-mono">{projectLaunchTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {projectLaunchTime.toLocaleDateString('vi-VN')}</span>
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  <strong>Quy định nghiệp vụ:</strong> Không phải cứ booking xong là được khớp căn ngay, mà tất cả các lượt booking đều phải chờ đến thời điểm ra hàng. Đúng giờ ra hàng, Lượt Booking #001 được 10 phút khớp căn đầu tiên, tiếp theo đến Lượt #002 (+10 phút), Lượt #003 (+20 phút),... tuần tự cho tới hết.
+                </p>
+              </div>
+
+              {/* Action Buttons for Testing & Resetting */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+                <button
+                  onClick={() => handleScheduleLaunch('2026-09-11T14:00:00+07:00')}
+                  disabled={isSchedulingLaunch}
+                  className="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-amber-500/30 flex items-center space-x-1.5 transition shadow"
+                  title="Đặt lại mốc ra hàng chuẩn 14h00 ngày 11/09/2026 (Chờ ra hàng)"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Chuẩn Đề Bài: 14h00 11/09</span>
+                </button>
+
+                <button
+                  onClick={() => handleScheduleLaunch(new Date().toISOString())}
+                  disabled={isSchedulingLaunch}
+                  className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition"
+                  title="Mô phỏng kích hoạt giờ ra hàng ngay lập tức để kiểm tra lượt khớp căn 10 phút"
+                >
+                  <Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
+                  <span>{isSchedulingLaunch ? 'Đang kích hoạt...' : 'Mô Phỏng: Mở Bán Ngay'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* Booking KPI Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="glass-panel p-4 rounded-xl border border-slate-800">
@@ -672,9 +796,17 @@ export function InventoryMatrix({
                   <tbody className="divide-y divide-slate-800 text-slate-200">
                     {bookings.map((b: any) => {
                       const isPendingDeposit = b.trangthaikhopcan === 'CHO_DUYET_COC';
-                      const isMatching = b.trangthaikhopcan === 'DANG_KHOP';
                       const isMatched = b.trangthaikhopcan === 'DA_KHOP' || b.trangthaikhopcan === 'Đã khớp';
                       const isExpired = b.trangthaikhopcan === 'HUY' || b.trangthaikhopcan === 'Hết thời gian';
+
+                      const startTs = b.tgBatdaukhop ? new Date(b.tgBatdaukhop).getTime() : 0;
+                      const endTs = b.tgKetthuckhopcan ? new Date(b.tgKetthuckhopcan).getTime() : 0;
+
+                      // Lượt đang khớp nếu không phải chờ ra hàng, và thời điểm hiện tại nằm trong [startTs, endTs]
+                      const isMatching = !isWaitingForLaunch && Boolean(b.depositConfirmedAt) && !isMatched && !isExpired && (
+                        b.trangthaikhopcan === 'DANG_KHOP' || (nowTime >= startTs && nowTime <= endTs)
+                      );
+                      const isWaitingLaunch = nowTime < startTs;
 
                       const formatHM = (dt?: string | Date | null) => {
                         if (!dt) return '';
@@ -705,11 +837,11 @@ export function InventoryMatrix({
                           <td className="p-3.5">
                             <div className="text-[12px] text-emerald-400 font-mono font-medium flex items-center gap-1.5">
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold">Bắt đầu</span>
-                              <span>{formatHM(b.tgBatdaukhop) || '09h10'}</span>
+                              <span>{formatHM(b.tgBatdaukhop) || '14h00'}</span>
                             </div>
                             <div className="text-[12px] text-rose-400 font-mono font-medium flex items-center gap-1.5 mt-1">
                               <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 font-semibold">Kết thúc</span>
-                              <span>{formatHM(b.tgKetthuckhopcan) || '09h20'}</span>
+                              <span>{formatHM(b.tgKetthuckhopcan) || '14h10'}</span>
                             </div>
                           </td>
                           <td className="p-3.5 font-bold text-brand-400">
@@ -734,9 +866,15 @@ export function InventoryMatrix({
                               <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-rose-500/20 text-rose-400 border border-rose-500/40 w-max block">
                                 Hết Thời Gian
                               </span>
+                            ) : isWaitingLaunch ? (
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/30 flex items-center gap-1 w-max">
+                                <Clock className="w-3 h-3 text-amber-400" />
+                                <span>Chờ Ra Hàng ({formatHM(b.tgBatdaukhop)})</span>
+                              </span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-slate-800 text-slate-300 border border-slate-700 w-max block">
-                                Chờ Khớp Căn
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-1 w-max">
+                                <Clock className="w-3 h-3 text-blue-400" />
+                                <span>Chưa Tới Lượt ({formatHM(b.tgBatdaukhop)})</span>
                               </span>
                             )}
                           </td>
@@ -785,6 +923,50 @@ export function InventoryMatrix({
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Waiting for Launch Event Banner */}
+          {isWaitingForLaunch && (
+            <div className="glass-panel p-4 rounded-2xl border-2 border-amber-500/70 bg-gradient-to-r from-amber-950/60 via-slate-900 to-slate-950 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="flex items-center space-x-3.5">
+                <div className="p-3 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 shrink-0">
+                  <Clock className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-black text-white uppercase tracking-wider">
+                      Dự Án Đang Chờ Ra Hàng Mở Bán Chính Thức
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-slate-950 uppercase animate-pulse">
+                      Chờ Ra Hàng
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-200 mt-1">
+                    Thời điểm ra hàng: <strong className="text-amber-300">14:00 - Thứ Sáu, ngày 11/09/2026</strong>. Tất cả các lượt booking đều phải chờ đến thời điểm ra hàng.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Quy tắc khớp căn tuần tự: Lượt #001 (14h00 - 14h10), Lượt #002 (14h10 - 14h20), ... Lượt #00k mỗi lượt 10 phút.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-3 shrink-0 self-end md:self-center">
+                <div className="px-4 py-2 rounded-xl bg-slate-900 border border-amber-500/50 text-center shadow-lg">
+                  <div className="text-[10px] text-amber-400 font-semibold uppercase">Đếm Ngược Ra Hàng</div>
+                  <div className="text-sm font-mono font-black text-amber-300">
+                    {getLaunchCountdown(projectLaunchTime)}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleScheduleLaunch(new Date().toISOString())}
+                  disabled={isSchedulingLaunch}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase shadow-md flex items-center space-x-1.5 transition"
+                  title="Mô phỏng bắt đầu giờ ra hàng ngay lập tức để thử nghiệm khớp căn 10 phút"
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-300" />
+                  <span>{isSchedulingLaunch ? 'Đang kích hoạt...' : 'Mô Phỏng: Mở Bán Ngay'}</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Active 10-Minute Matching Window Banner */}
           {activeMatchingBooking && (
             <div className="glass-panel p-4 rounded-2xl border-2 border-emerald-500/80 bg-gradient-to-r from-emerald-950/70 via-teal-950/50 to-slate-900 shadow-2xl shadow-emerald-500/20 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 animate-pulse-glow">
@@ -876,7 +1058,7 @@ export function InventoryMatrix({
 
             <div className="glass-panel p-3.5 rounded-xl border border-emerald-500/20 bg-emerald-950/10 flex items-center justify-between">
               <div>
-                <div className="text-[11px] text-emerald-400 font-semibold uppercase">Còn Hàng</div>
+                <div className="text-[11px] text-emerald-400 font-semibold uppercase">Còn hàng</div>
                 <div className="text-xl font-black text-emerald-400 mt-0.5">{counts.AVAILABLE}</div>
               </div>
               <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping"></div>
@@ -884,7 +1066,7 @@ export function InventoryMatrix({
 
             <div className="glass-panel p-3.5 rounded-xl border border-amber-500/20 bg-amber-950/10 flex items-center justify-between">
               <div>
-                <div className="text-[11px] text-amber-400 font-semibold uppercase">Đang Lock 30m</div>
+                <div className="text-[11px] text-amber-400 font-semibold uppercase">Đang Lock</div>
                 <div className="text-xl font-black text-amber-400 mt-0.5">{counts.LOCKED}</div>
               </div>
               <Lock className="w-4 h-4 text-amber-400 animate-bounce" />
@@ -892,7 +1074,7 @@ export function InventoryMatrix({
 
             <div className="glass-panel p-3.5 rounded-xl border border-purple-500/20 bg-purple-950/10 flex items-center justify-between">
               <div>
-                <div className="text-[11px] text-purple-400 font-semibold uppercase">Đã Bán</div>
+                <div className="text-[11px] text-purple-400 font-semibold uppercase">Đã bán</div>
                 <div className="text-xl font-black text-purple-400 mt-0.5">{counts.SOLD}</div>
               </div>
               <Sparkles className="w-4 h-4 text-purple-400" />
@@ -933,7 +1115,7 @@ export function InventoryMatrix({
                           {floor.units.map((prod) => {
                             const priceObj = prod.prices?.[0];
                             const displayPrice = priceObj ? `${(priceObj.amount / 1000000000).toFixed(2)} Tỷ` : 'Liên hệ';
-                            const isSold = prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc';
+                            const isSold = isProductSold(prod);
                             const isLocked = (prod.status === 'LOCKED' || prod.trangthai === 'Đã khớp') && !isSold;
                             const isAvailable = (prod.status === 'AVAILABLE' || prod.trangthai === 'Còn hàng' || prod.trangthai === 'Check Admin') && !isSold && !isLocked;
 
@@ -955,7 +1137,7 @@ export function InventoryMatrix({
                                   <span className="text-xs font-black text-white group-hover:text-brand-300 transition">
                                     {prod.productCode}
                                   </span>
-                                  {getStatusBadge(prod.status, prod.trangthai)}
+                                  {getStatusBadge(prod.status, prod.trangthai, isSold)}
                                 </div>
 
                                 <div className="text-[11px] text-slate-300 font-semibold mb-1">
@@ -969,7 +1151,15 @@ export function InventoryMatrix({
 
                                 {/* Actions for Sales */}
                                 {isAvailable && currentRole === 'SALES' && (
-                                  activeMatchingBooking ? (
+                                  isWaitingForLaunch ? (
+                                    <div
+                                      className="w-full mt-2 py-1.5 px-2 rounded-lg bg-slate-800/90 text-amber-300 font-bold text-[10px] text-center border border-amber-500/30 flex items-center justify-center space-x-1 cursor-not-allowed shadow-inner"
+                                      title="Dự án đang chờ thời điểm ra hàng chính thức (14:00 11/09). Tất cả các lượt booking đều phải chờ đến giờ ra hàng mới được khớp căn!"
+                                    >
+                                      <Clock className="w-3 h-3 text-amber-400 animate-pulse" />
+                                      <span>Chờ Ra Hàng (14h00 11/09)</span>
+                                    </div>
+                                  ) : activeMatchingBooking ? (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1066,7 +1256,7 @@ export function InventoryMatrix({
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
                   {filteredProducts.map((prod) => {
                     const priceObj = prod.prices?.[0];
-                    const isSold = prod.status === 'SOLD' || prod.status === 'DEPOSITED' || prod.trangthai === 'Đã bán' || prod.trangthai === 'Đã cọc';
+                    const isSold = isProductSold(prod);
                     const isAvailable = (prod.status === 'AVAILABLE' || prod.trangthai === 'Còn hàng' || prod.trangthai === 'Check Admin') && !isSold && prod.status !== 'LOCKED';
 
                     return (
@@ -1081,10 +1271,18 @@ export function InventoryMatrix({
                         <td className="p-3.5 text-slate-300">
                           {priceObj ? Number(priceObj.depositAmount).toLocaleString('vi-VN') : '100.000.000'}
                         </td>
-                        <td className="p-3.5">{getStatusBadge(prod.status, prod.trangthai)}</td>
+                        <td className="p-3.5">{getStatusBadge(prod.status, prod.trangthai, isSold)}</td>
                         <td className="p-3.5 text-right space-x-1.5 whitespace-nowrap">
                           {isAvailable && currentRole === 'SALES' && (
-                            activeMatchingBooking ? (
+                            isWaitingForLaunch ? (
+                              <span
+                                className="px-2.5 py-1 rounded-lg bg-slate-800/90 text-amber-300 font-bold text-[10px] uppercase border border-amber-500/30 inline-flex items-center gap-1 cursor-not-allowed shadow-inner"
+                                title="Dự án đang chờ thời điểm ra hàng chính thức (14:00 11/09). Tất cả các lượt booking đều phải chờ đến giờ ra hàng mới được khớp căn!"
+                              >
+                                <Clock className="w-3 h-3 text-amber-400 animate-pulse" />
+                                <span>Chờ Ra Hàng (14h00 11/09)</span>
+                              </span>
+                            ) : activeMatchingBooking ? (
                               <button
                                 onClick={() => handleMatchUnit(prod, activeMatchingBooking.id)}
                                 disabled={matchingLoadingUnitId === prod.id}
@@ -1170,7 +1368,7 @@ export function InventoryMatrix({
               <div>
                 <div className="flex items-center space-x-3">
                   <h2 className="text-xl font-black text-white">Căn Hộ {selectedProduct.productCode}</h2>
-                  {getStatusBadge(selectedProduct.status, selectedProduct.trangthai)}
+                  {getStatusBadge(selectedProduct.status, selectedProduct.trangthai, isProductSold(selectedProduct))}
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
                   {selectedProduct.building} | Tầng {selectedProduct.floor} | Dự án AHS Grand Horizon
@@ -1201,15 +1399,13 @@ export function InventoryMatrix({
               <div>
                 <span className="text-[11px] text-slate-400 block">Trạng thái [Trangthai]</span>
                 <span className={`text-sm font-bold ${
-                  selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc'
+                  isProductSold(selectedProduct)
                     ? 'text-purple-400'
                     : selectedProduct.trangthai === 'Check Admin'
                     ? 'text-amber-400'
                     : 'text-emerald-400'
                 }`}>
-                  {selectedProduct.status === 'SOLD' || selectedProduct.status === 'DEPOSITED' || selectedProduct.trangthai === 'Đã bán' || selectedProduct.trangthai === 'Đã cọc'
-                    ? 'Đã bán'
-                    : selectedProduct.trangthai || selectedProduct.status}
+                  {getCanonicalProductLabel(selectedProduct.status, selectedProduct.trangthai)}
                 </span>
               </div>
             </div>

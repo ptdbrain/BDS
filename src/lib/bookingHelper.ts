@@ -109,8 +109,13 @@ export async function ensureBookingExists(bookingData: any, projectData?: any) {
 
   // 6. Calculate matching windows
   const now = new Date();
-  const startMatch = bookingData.tgBatdaukhop ? new Date(bookingData.tgBatdaukhop) : now;
-  const endMatch = bookingData.tgKetthuckhopcan ? new Date(bookingData.tgKetthuckhopcan) : new Date(startMatch.getTime() + 10 * 60 * 1000);
+  const projectLaunchTime = project.saleOpenAt ? new Date(project.saleOpenAt) : new Date(2026, 8, 11, 14, 0, 0);
+  const startMatch = bookingData.tgBatdaukhop
+    ? new Date(bookingData.tgBatdaukhop)
+    : new Date(projectLaunchTime.getTime() + (stt - 1) * 10 * 60 * 1000);
+  const endMatch = bookingData.tgKetthuckhopcan
+    ? new Date(bookingData.tgKetthuckhopcan)
+    : new Date(startMatch.getTime() + 10 * 60 * 1000);
 
   // 7. Create the booking
   try {
@@ -124,7 +129,7 @@ export async function ensureBookingExists(bookingData: any, projectData?: any) {
         tgBooking: bookingData.tgBooking ? new Date(bookingData.tgBooking) : now,
         tgBatdaukhop: startMatch,
         tgKetthuckhopcan: endMatch,
-        trangthaikhopcan: bookingData.trangthaikhopcan || 'CHO_DUYET_COC',
+        trangthaikhopcan: bookingData.trangthaikhopcan || 'CHO_KHOP',
         customerName: custName,
         customerPhone: custPhone,
         depositAmount: parseFloat(String(bookingData.depositAmount || 50000000)),

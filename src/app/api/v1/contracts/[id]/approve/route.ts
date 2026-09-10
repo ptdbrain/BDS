@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { ensureContractExists } from '@/lib/contractHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { getAuthorizedFinancialFields } from '@/lib/contractFinancialPolicy';
 
 export async function POST(
   request: Request,
@@ -10,6 +11,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
+    if (actorRole !== 'SALES_ADMIN' && actorRole !== 'MANAGER') {
+      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được duyệt hợp đồng.' }, { status: 403 });
+    }
     const {
       reviewerId = 'NV007',
       reviewerName = 'Vũ Mai Phương (Sales Admin)',
@@ -54,6 +59,9 @@ export async function POST(
     }
 
     const validReviewerId = await resolveEmployeeId(reviewerId, 'SALES_ADMIN');
+    const financialFields = actorRole === 'SALES_ADMIN'
+      ? getAuthorizedFinancialFields(actorRole, contractData || {})
+      : {};
 
     const now = new Date();
 
@@ -67,9 +75,9 @@ export async function POST(
           signedDate: now,
           signedAt: now,
           trangthaiHDMB: 'Đã ký',
-          dealRevenue: contract.dealRevenue || contract.agreedPrice,
-          doanhso: contract.doanhso || contract.agreedPrice,
-          hoahong: contract.hoahong || Math.round((contract.agreedPrice || 4800000000) * 0.03),
+          dealRevenue: contract.dealRevenue ?? contract.agreedPrice,
+          doanhso: contract.doanhso ?? contract.giahopdong ?? contract.agreedPrice,
+          ...financialFields,
           version: { increment: 1 }
         }
       });
@@ -83,6 +91,39 @@ export async function POST(
             trangthai: 'Đã bán'
           }
         });
+
+        // Cập nhật tất cả lượt lock đang active / pending sang DEPOSIT_CONFIRMED để giải phóng danh sách lock
+        const activeLocks = await tx.productLock.findMany({
+          where: {
+            productId: contract.productId,
+            status: { in: ['ACTIVE', 'PAYMENT_PENDING'] }
+          }
+        });
+
+        if (activeLocks.length > 0) {
+          await tx.productLock.updateMany({
+            where: {
+              productId: contract.productId,
+              status: { in: ['ACTIVE', 'PAYMENT_PENDING'] }
+            },
+            data: {
+              status: 'DEPOSIT_CONFIRMED',
+              depositConfirmedAt: now
+            }
+          });
+
+          const lockIds = activeLocks.map(l => l.id);
+          await tx.paymentTransaction.updateMany({
+            where: {
+              lockId: { in: lockIds }
+            },
+            data: {
+              status: 'SUCCEEDED',
+              paidAt: now,
+              rawSummary: `Hợp đồng đã được Sales Admin duyệt (${reviewerName}). Căn chính thức Đã Bán.`
+            }
+          });
+        }
       }
 
       await tx.contractReview.create({

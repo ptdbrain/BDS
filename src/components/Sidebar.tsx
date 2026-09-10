@@ -5,12 +5,15 @@ import { UserRole } from '@/lib/types';
 import {
   Grid,
   Clock,
-  UserCheck,
   FileText,
   BarChart3,
-  ShieldCheck,
   Building,
-  Upload
+  DollarSign,
+  ClipboardList,
+  CheckSquare,
+  Layers,
+  TrendingUp,
+  UserCheck
 } from 'lucide-react';
 
 export type TabType =
@@ -19,7 +22,8 @@ export type TabType =
   | 'transactions_revenue'
   | 'locks'
   | 'contracts'
-  | 'reports';
+  | 'reports'
+  | 'my_contracts';
 
 interface SidebarProps {
   activeTab: TabType;
@@ -49,114 +53,112 @@ export function Sidebar({
   pendingContractsCount,
   pendingBookingsCount = 0
 }: SidebarProps) {
-  // 1. Sales Agent: 3 items strictly
+
+  // 1. NVKD (Sales): 4 mục theo đặc tả mới
   const salesNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
       label: '1. Dự Án & Bảng Hàng',
-      desc: 'Thông tin dự án & Quỹ hàng (Lock)',
+      desc: 'Xem quỹ hàng, giá bán, trạng thái căn, Lock/Booking',
       icon: Grid,
       badge: activeLocksCount > 0 ? activeLocksCount : null,
       badgeColor: 'bg-amber-500'
     },
     {
-      id: 'customers' as TabType,
-      label: '2. Thông Tin Khách Hàng Cá Nhân',
-      desc: 'Quản lý khách mình bán (CRUD)',
-      icon: UserCheck,
+      id: 'locks' as TabType,
+      label: '2. Giao Dịch của Tôi',
+      desc: 'Theo dõi Lock, Booking & trạng thái xác nhận',
+      icon: Clock,
+      badge: null,
+      badgeColor: 'bg-amber-500'
+    },
+    {
+      id: 'my_contracts' as TabType,
+      label: '3. Hợp Đồng của Tôi',
+      desc: 'Nhập thông tin khách & xem HĐ sau giao dịch',
+      icon: FileText,
       badge: null,
       badgeColor: 'bg-brand-500'
     },
     {
       id: 'transactions_revenue' as TabType,
-      label: '3. Lịch Sử & Doanh Số Cá Nhân',
-      desc: 'Báo cáo doanh số cá nhân (Chỉ xem)',
-      icon: BarChart3,
+      label: '4. Doanh Số & Hoa Hồng',
+      desc: 'Mã căn | Mã HĐ | Giá HĐ | Doanh số | Hoa hồng',
+      icon: DollarSign,
       badge: null,
       badgeColor: 'bg-purple-500'
     }
   ];
 
-  // 2. Product Manager (Nhân viên Quản Lý Sản Phẩm):
-  // Có: Dự án & Bảng hàng (thêm ảnh/slide dự án + add từng trường quỹ hàng), Giao dịch [Chỉ xem], Báo cáo.
-  // KHÔNG CÓ: Thông tin khách hàng cá nhân & Doanh số cá nhân.
+  // 2. Product Manager (Nhân viên Quản Lý Sản Phẩm): 2 mục
+  // Chỉ xem BC_SanPham_DuAn, KHÔNG xem doanh thu công ty
   const productAdminNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
-      label: '1. Dự Án & Bảng Hàng',
-      desc: 'Slide dự án & Quỹ hàng (Add căn)',
-      icon: Grid,
+      label: '1. Dự Án & Sản Phẩm',
+      desc: 'Thêm/sửa dự án, quỹ hàng, giá bán',
+      icon: Layers,
       badge: null
     },
     {
-      id: 'locks' as TabType,
-      label: '2. Giao Dịch (Khóa Căn & T.Toán)',
-      desc: 'Xem căn lock & thanh toán (Chỉ xem)',
-      icon: Clock,
-      badge: activeLocksCount > 0 ? activeLocksCount : null,
-      badgeColor: 'bg-amber-500'
-    },
-    {
       id: 'reports' as TabType,
-      label: 'Báo Cáo',
-      desc: '',
+      label: '2. Báo Cáo Sản Phẩm',
+      desc: 'Lượng hàng bán theo dự án (Chỉ xem)',
       icon: BarChart3,
       badge: null
     }
   ];
 
-  // 3. Sales Admin:
-  // - Giao dịch (khoá căn + ttoan): hiển thị căn lock, có nút xác nhận chuyển khoản -> chuyển Đã bán.
-  // - Thông tin khách hàng: tất cả KH giao dịch + căn đính kèm, duyệt / yêu cầu sửa, xuất file CĐT.
-  // - Danh mục hợp đồng: nhập HĐ từ CĐT, thời gian ký, trạng thái ký, doanh số, hoa hồng -> chuyển về cho Sales.
+  // 3. Sales Admin: 3 mục nghiệp vụ
+  // KHÔNG có quyền vào báo cáo doanh thu tổng hợp công ty
   const salesAdminTotalPendingLocks = activeLocksCount + pendingBookingsCount;
   const salesAdminNavItems: NavItem[] = [
     {
       id: 'locks' as TabType,
-      label: '1. Giao Dịch (Khóa Căn & T.Toán)',
-      desc: 'Xác nhận chuyển khoản → Đã bán',
-      icon: Clock,
+      label: '1. Xác Nhận Giao Dịch',
+      desc: 'Kiểm tra thanh toán Lock/Booking, xếp lượt',
+      icon: CheckSquare,
       badge: salesAdminTotalPendingLocks > 0 ? salesAdminTotalPendingLocks : null,
       badgeColor: pendingBookingsCount > 0 ? 'bg-rose-500' : 'bg-amber-500'
     },
     {
-      id: 'customers' as TabType,
-      label: '2. Thông Tin Khách Hàng',
-      desc: 'Kèm căn cọc, duyệt PII & Xuất file CĐT',
-      icon: UserCheck,
-      badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : null,
-      badgeColor: 'bg-brand-500'
-    },
-    {
       id: 'contracts' as TabType,
-      label: '3. Danh Mục Hợp Đồng CĐT',
-      desc: 'Nhập HĐ, hoa hồng & trạng thái ký',
-      icon: FileText,
+      label: '2. Xác Minh Hợp Đồng',
+      desc: 'Xem HĐ NVKD gửi lên; phê duyệt hoặc yêu cầu sửa',
+      icon: ClipboardList,
       badge: pendingContractsCount > 0 ? pendingContractsCount : null,
       badgeColor: 'bg-purple-500'
+    },
+    {
+      id: 'customers' as TabType,
+      label: '3. Cập Nhật DT & Hoa Hồng',
+      desc: 'Nhập Doanh Thu AHS, cập nhật Hoa Hồng NVKD',
+      icon: DollarSign,
+      badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : null,
+      badgeColor: 'bg-brand-500'
     }
   ];
 
-  // 4. Executive Management (Giám đốc)
+  // 4. Executive Management (Ban Lãnh Đạo / Giám đốc): full access
   const managerNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
       label: 'Bảng Hàng & Quỹ Hàng',
-      desc: 'Quản lý căn & Bảng matrix',
+      desc: 'Quản lý căn & bảng matrix',
       icon: Grid,
       badge: null
     },
     {
       id: 'locks' as TabType,
-      label: 'Khóa Căn & Thanh Toán',
-      desc: 'Giữ căn 30m & QR VietQR',
+      label: 'Khóa Căn & Giao Dịch',
+      desc: 'Giữ căn 30m & trạng thái giao dịch',
       icon: Clock,
       badge: activeLocksCount > 0 ? activeLocksCount : null,
       badgeColor: 'bg-amber-500'
     },
     {
       id: 'customers' as TabType,
-      label: 'Khách Hàng & Duyệt Hồ Sơ',
+      label: 'Khách Hàng & Hồ Sơ',
       desc: 'Xác minh PII khách hàng',
       icon: UserCheck,
       badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : null,
@@ -172,9 +174,9 @@ export function Sidebar({
     },
     {
       id: 'reports' as TabType,
-      label: 'Báo Cáo',
-      desc: '',
-      icon: BarChart3,
+      label: 'Báo Cáo Tổng Hợp',
+      desc: 'Doanh thu, doanh số & KPI toàn công ty',
+      icon: TrendingUp,
       badge: null
     }
   ];
@@ -226,7 +228,7 @@ export function Sidebar({
                 </div>
               </div>
 
-              {item.badge !== null && (
+              {item.badge !== null && item.badge !== undefined && (
                 <span
                   className={`px-2 py-0.5 text-[10px] font-bold rounded-full text-white ${
                     item.badgeColor || 'bg-brand-500'

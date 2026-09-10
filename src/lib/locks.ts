@@ -135,7 +135,7 @@ export async function acquireProductLock({
         },
         data: {
           status: 'LOCKED',
-          trangthai: 'Đang giữ chỗ',
+          trangthai: 'Đang lock',
           version: { increment: 1 }
         }
       });

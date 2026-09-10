@@ -16,6 +16,7 @@ import { LoginScreen } from '@/components/LoginScreen';
 import { SwitchAccountModal } from '@/components/SwitchAccountModal';
 import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
 import { broadcastSync, onSync } from '@/lib/sync';
+import { getNavigationTabsForRole } from '@/lib/rolePolicy';
 
 export default function Home() {
   // Authentication & Role State
@@ -39,6 +40,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState<boolean>(false);
   const [activeLockModal, setActiveLockModal] = useState<any | null>(null);
+  const [customerIntakeLock, setCustomerIntakeLock] = useState<any | null>(null);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
 
   // Check stored auth on boot
@@ -97,12 +99,21 @@ export default function Home() {
           const stored = localStorage.getItem('ahs_custom_products');
           if (stored) {
             const customProds = JSON.parse(stored);
+            let hasChanged = false;
             if (Array.isArray(customProds)) {
               for (const cp of customProds) {
                 if (cp.projectId === selectedProjectId) {
                   const existingIdx = mergedProducts.findIndex(p => p.id === cp.id || p.productCode === cp.productCode);
                   if (existingIdx >= 0) {
-                    if (cp.status && cp.status !== 'AVAILABLE') {
+                    const serverProd = mergedProducts[existingIdx];
+                    // If the server product is already SOLD or DEPOSITED, DB is the source of truth!
+                    if (serverProd.status === 'SOLD' || serverProd.status === 'DEPOSITED' || serverProd.trangthai === 'Đã bán' || serverProd.trangthai === 'Đã cọc') {
+                      if (cp.status !== serverProd.status || cp.trangthai !== serverProd.trangthai) {
+                        cp.status = serverProd.status;
+                        cp.trangthai = serverProd.trangthai;
+                        hasChanged = true;
+                      }
+                    } else if (cp.status && cp.status !== 'AVAILABLE') {
                       mergedProducts[existingIdx].status = cp.status;
                       mergedProducts[existingIdx].trangthai = cp.trangthai;
                     }
@@ -110,6 +121,9 @@ export default function Home() {
                     mergedProducts.push(cp);
                   }
                 }
+              }
+              if (hasChanged) {
+                localStorage.setItem('ahs_custom_products', JSON.stringify(customProds));
               }
             }
           }
@@ -180,7 +194,10 @@ export default function Home() {
   // Fetch Contracts
   const fetchContracts = async () => {
     try {
-      const res = await fetch('/api/v1/contracts');
+      const params = new URLSearchParams();
+      if (currentRole) params.set('role', currentRole);
+      if (currentUser?.employeeCode) params.set('employeeCode', currentUser.employeeCode);
+      const res = await fetch('/api/v1/contracts?' + params.toString());
       const data = await res.json();
       if (data.data) setContracts(data.data);
     } catch (err) {
@@ -188,10 +205,19 @@ export default function Home() {
     }
   };
 
-  // Fetch Report Data
+  // Fetch Report Data (với phân quyền role)
   const fetchReportData = async () => {
+    if (currentRole === 'SALES_ADMIN') {
+      setReportData(null);
+      return;
+    }
     try {
-      const res = await fetch('/api/v1/reports/dashboard');
+      const role = currentRole || 'SALES';
+      const empCode = currentUser?.employeeCode || '';
+      const params = new URLSearchParams();
+      if (role) params.append('role', role);
+      if (empCode) params.append('employeeCode', empCode);
+      const res = await fetch(`/api/v1/reports/dashboard?${params.toString()}`);
       const data = await res.json();
       if (data.data) setReportData(data.data);
     } catch (err) {
@@ -292,7 +318,7 @@ export default function Home() {
           const item = list.find((p: any) => p.id === productId || p.productCode === targetProduct?.productCode);
           if (item) {
             item.status = 'LOCKED';
-            item.trangthai = 'Đang giữ chỗ';
+            item.trangthai = 'Đang lock';
             localStorage.setItem('ahs_custom_products', JSON.stringify(list));
           }
         }
@@ -326,6 +352,9 @@ export default function Home() {
 
   // Action: Transition from Lock to Customer Intake
   const handleProceedToCustomer = (lock?: any) => {
+    if (lock) {
+      setCustomerIntakeLock(lock);
+    }
     setActiveTab('customers');
   };
 
@@ -388,6 +417,7 @@ export default function Home() {
   };
 
   const handleTabChange = (tab: TabType) => {
+    if (!getNavigationTabsForRole(currentRole).includes(tab)) return;
     setActiveTab(tab);
     refreshAllData();
   };
@@ -483,6 +513,9 @@ export default function Home() {
               currentRole={currentRole}
               currentUser={currentUser}
               onRefresh={refreshAllData}
+              prefilledLock={customerIntakeLock}
+              autoOpenForm={!!customerIntakeLock}
+              onClearPrefilledLock={() => setCustomerIntakeLock(null)}
             />
           )}
 
@@ -497,13 +530,48 @@ export default function Home() {
             />
           )}
 
+          {/* Tab 'my_contracts': NVKD xem và nhập thông tin hợp đồng của chính mình */}
+          {activeTab === 'my_contracts' && (
+            <ContractWorkflow
+              contracts={contracts.filter((c: any) => {
+                if (currentRole !== 'SALES') return true;
+                const empCode = currentUser?.employeeCode;
+                if (!empCode) return true;
+                return (
+                  c.salesEmployee?.employeeCode === empCode ||
+                  c.salesEmployee?.maNV === empCode ||
+                  c.salesEmployeeId === currentUser?.id
+                );
+              })}
+              products={products}
+              customers={customers}
+              currentRole={currentRole}
+              currentUser={currentUser}
+              onRefresh={refreshAllData}
+            />
+          )}
+
           {activeTab === 'reports' && (
             <ReportsDashboard
               reportData={reportData}
               onRefresh={refreshAllData}
+              currentRole={currentRole}
+              currentUser={currentUser}
             />
           )}
         </main>
+
+        {/* Global Enterprise Footer */}
+        <footer className="mt-10 py-5 border-t border-slate-800/80 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-white tracking-wide">AHS PROPERTY</span>
+            <span className="text-slate-600">•</span>
+            <span className="font-medium text-slate-300">WEBSITE QUẢN LÝ SẢN PHẨM VÀ GIAO DỊCH</span>
+          </div>
+          <div className="text-slate-400 text-xs">
+            Phụ trách xây dựng: <span className="text-amber-400 font-semibold">Nhân viên quản lý sản phẩm Hoàng Thị Hương Giang</span>
+          </div>
+        </footer>
       </div>
 
       {/* Switch Account SSO Modal */}
@@ -524,9 +592,10 @@ export default function Home() {
             refreshAllData();
             broadcastSync('ALL_DATA_UPDATED');
           }}
-          onProceedToCustomer={() => {
+          onProceedToCustomer={(lockToUse) => {
+            const finalLock = lockToUse || activeLockModal;
             setActiveLockModal(null);
-            setActiveTab('customers');
+            handleProceedToCustomer(finalLock);
           }}
         />
       )}

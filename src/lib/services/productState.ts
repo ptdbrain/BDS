@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { createAuditLog } from '../audit';
 import { ProductStatus } from '../types';
+import { getCanonicalProductLabel } from '../productStatus';
 
 export const VALID_PRODUCT_TRANSITIONS: Record<ProductStatus, ProductStatus[]> = {
   AVAILABLE: ['LOCKED', 'UNAVAILABLE'],
@@ -67,6 +68,7 @@ export async function transitionProductState({
       where: { id: productId },
       data: {
         status: toStatus,
+        trangthai: getCanonicalProductLabel(toStatus),
         version: { increment: 1 }
       }
     });

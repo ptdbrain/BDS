@@ -19,7 +19,7 @@ interface VietQRModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPaymentSuccess: () => void;
-  onProceedToCustomer: () => void;
+  onProceedToCustomer: (lock?: any) => void;
 }
 
 export function VietQRModal({
@@ -216,6 +216,15 @@ export function VietQRModal({
                   <ShieldCheck className="w-4 h-4" />
                   <span>{isProcessing ? 'Đang Kiểm Tra Ngân Hàng...' : 'Xác Nhận Đã Thanh Toán VietQR'}</span>
                 </button>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onProceedToCustomer(lock);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-slate-850 hover:bg-slate-750 text-emerald-300 hover:text-emerald-200 border border-emerald-500/30 font-bold text-xs flex items-center justify-center space-x-2 transition shadow-sm"
+                >
+                  <span>📋 Điền Thông Tin Khách Hàng Cho Căn Này →</span>
+                </button>
                 <p className="text-[10px] text-slate-500 text-center">
                   Hệ thống tự động lắng nghe Webhook ngân hàng & chuyển trạng thái căn sang "Đã Bán" ngay khi nhận tiền.
                 </p>
@@ -235,15 +244,23 @@ export function VietQRModal({
                 </p>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <button
                   onClick={() => {
                     onClose();
-                    onProceedToCustomer();
+                    onProceedToCustomer(lock);
                   }}
-                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-400 hover:to-purple-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-brand-500/30 transition"
+                  className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-500 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center space-x-2 shadow-xl shadow-brand-500/30 transition transform hover:-translate-y-0.5"
                 >
-                  <span>Hoàn Tất & Đóng</span>
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>📋 Tiến Hành Điền Thông Tin Khách Hàng Ngay →</span>
+                </button>
+
+                <button
+                  onClick={onClose}
+                  className="w-full py-2.5 px-6 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition"
+                >
+                  <span>Đóng & Xem Quỹ Hàng</span>
                 </button>
               </div>
             </div>

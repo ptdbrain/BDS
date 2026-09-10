@@ -1,4 +1,5 @@
 import { db } from './db';
+import { getCanonicalProductLabel } from './productStatus';
 
 /**
  * Self-healing helper for Vercel multi-container serverless SQLite environment.
@@ -121,7 +122,7 @@ export async function ensureProductExists(productData: any) {
   const handoverPlan = (productData.handoverPlan || 'Hoàn thiện cao cấp').trim();
   const building = (productData.building || 'Tòa A').trim();
   const status = productData.status || 'AVAILABLE';
-  const trangthai = productData.trangthai || (status === 'AVAILABLE' ? 'Còn hàng' : status);
+  const trangthai = getCanonicalProductLabel(status, productData.trangthai);
 
   // 7. Upsert Product into this container's SQLite database
   try {
