@@ -15,6 +15,7 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
+import { AHSLogo } from '@/components/AHSLogo';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: any) => void;
@@ -96,20 +97,13 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
 
       {/* Top Header */}
       <header className="px-6 py-5 max-w-7xl mx-auto w-full flex items-center justify-between border-b border-slate-800/80 relative z-10">
-        <div className="flex items-center space-x-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-xl shadow-brand-500/20 border border-white/10">
-            <Building2 className="w-6 h-6 text-white" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="font-black text-xl tracking-wider text-white">AHS REAL ESTATE</span>
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">
-                ENTERPRISE v2.5
-              </span>
-            </div>
-            <p className="text-xs text-slate-400">Hệ Thống Quản Lý Quỹ Hàng & Phân Quyền Bảo Mật SSO</p>
-          </div>
-        </div>
+        <AHSLogo
+          size="lg"
+          variant="horizontal"
+          badgeText="ENTERPRISE v2.5"
+          subtitle="WEBSITE QUẢN LÝ SẢN PHẨM VÀ GIAO DỊCH"
+          credit="Phụ trách xây dựng: Nhân viên quản lý sản phẩm Hoàng Thị Hương Giang"
+        />
 
         <div className="flex items-center space-x-2">
           <span className="relative flex h-2.5 w-2.5">
@@ -271,7 +265,10 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
       {/* Footer */}
       <footer className="px-6 py-4 max-w-7xl mx-auto w-full border-t border-slate-800/60 text-center text-xs text-slate-400 relative z-10 flex flex-col sm:flex-row items-center justify-between gap-2">
         <div>
-          © 2026 CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS • Hệ thống Quản trị & Giao dịch Doanh nghiệp
+          © 2026 AHS PROPERTY • <strong>WEBSITE QUẢN LÝ SẢN PHẨM VÀ GIAO DỊCH</strong>
+          <span className="block sm:inline sm:ml-2 text-slate-400 font-medium">
+            (Phụ trách xây dựng: <span className="text-amber-400 font-semibold">Nhân viên quản lý sản phẩm Hoàng Thị Hương Giang</span>)
+          </span>
         </div>
         <div className="flex items-center space-x-4 text-[11px] text-slate-400">
           <span>Chuẩn bảo mật RBAC</span>

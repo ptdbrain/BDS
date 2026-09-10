@@ -16,6 +16,7 @@ import {
   Layers
 } from 'lucide-react';
 import { SSO_ACCOUNTS } from '@/lib/authConfig';
+import { AHSLogo } from '@/components/AHSLogo';
 
 interface NavbarProps {
   currentRole: UserRole;
@@ -59,7 +60,7 @@ export function Navbar({
     },
     PRODUCT_ADMIN: {
       label: 'Nhân Viên QL Sản Phẩm',
-      name: currentUser?.fullName || 'Nguyễn Thùy Dương (NV009)',
+      name: currentUser?.fullName || 'Hoàng Thị Hương Giang (NV009)',
       title: currentUser?.jobTitle || 'QL Sản Phẩm & Quỹ Hàng',
       color: 'from-blue-500 to-cyan-500',
       icon: Building2
@@ -87,24 +88,17 @@ export function Navbar({
   const displayCode = currentUser?.employeeCode ? `[${currentUser.employeeCode}]` : '';
 
   return (
-    <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 px-6 py-3">
+    <header className="sticky top-0 z-40 w-full glass-panel border-b border-slate-800/80 px-6 py-2.5">
       <div className="flex items-center justify-between">
         {/* Left Brand Identity */}
         <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-accent-cyan flex items-center justify-center shadow-lg shadow-brand-500/20">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-lg tracking-wider text-white">AHS REAL ESTATE</span>
-                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-brand-500/20 text-brand-400 border border-brand-500/30">
-                  ENTERPRISE v2.5
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">Hệ Thống Quản Lý Quỹ Hàng & Phân Quyền Bảo Mật SSO</p>
-            </div>
-          </div>
+          <AHSLogo
+            size="md"
+            variant="horizontal"
+            badgeText="ENTERPRISE v2.5"
+            subtitle="WEBSITE QUẢN LÝ SẢN PHẨM VÀ GIAO DỊCH"
+            credit="Phụ trách xây dựng: Nhân viên quản lý sản phẩm Hoàng Thị Hương Giang"
+          />
 
           <div className="hidden md:flex items-center space-x-2 pl-6 border-l border-slate-800">
             <span className="relative flex h-2.5 w-2.5">

@@ -8,9 +8,13 @@ const fontSans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'AHS Real Estate - Hệ Thống Quản Lý Quỹ Hàng & Giao Dịch Bất Động Sản',
-  description: 'Nền tảng quản lý quỹ hàng bất động sản thời gian thực, giữ căn 30 phút, đối soát cọc VietQR tự động và quản lý hợp đồng pháp lý.',
-  keywords: ['AHS Real Estate', 'Bất động sản', 'Quản lý quỹ hàng', 'VietQR', 'Hợp đồng mua bán'],
+  title: 'AHS Property - Hệ Thống Quản Lý Quỹ Hàng & Giao Dịch Bất Động Sản',
+  description: 'Nền tảng quản lý quỹ hàng bất động sản thời gian thực AHS Property, giữ căn 30 phút, đối soát cọc VietQR tự động và quản lý hợp đồng pháp lý.',
+  keywords: ['AHS Property', 'AHS Real Estate', 'Bất động sản AHS', 'Quản lý quỹ hàng', 'VietQR', 'Hợp đồng mua bán'],
+  icons: {
+    icon: '/logo.png',
+    apple: '/logo.png'
+  }
 };
 
 export default function RootLayout({

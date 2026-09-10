@@ -11,6 +11,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
+import { AHSLogo } from '@/components/AHSLogo';
 
 interface SwitchAccountModalProps {
   isOpen: boolean;
@@ -33,12 +34,10 @@ export function SwitchAccountModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-slate-950 font-bold shadow-md">
-              <Zap className="w-5 h-5" />
-            </div>
+            <AHSLogo size="sm" variant="icon-only" />
             <div>
               <h3 className="text-base font-black text-white">Chuyển Đổi Tài Khoản Nhanh (SSO Switcher)</h3>
-              <p className="text-xs text-slate-400">Chọn tài khoản muốn chuyển đổi quyền hạn làm việc:</p>
+              <p className="text-xs text-slate-400">Hệ thống phân quyền làm việc AHS Property</p>
             </div>
           </div>
           <button
