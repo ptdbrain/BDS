@@ -162,6 +162,32 @@ test('Excel export refreshes the report snapshot before writing rows', () => {
   assert.doesNotMatch(source, /const json = await res\.json\(\);/);
 });
 
+test('reports keep DoanhSo, DoanhThu, and HoaHong in separate columns', () => {
+  const routeSource = fs.readFileSync(new URL('../../src/app/api/v1/reports/dashboard/route.ts', import.meta.url), 'utf8');
+  const dashboardSource = fs.readFileSync(new URL('../../src/components/ReportsDashboard.tsx', import.meta.url), 'utf8');
+
+  assert.match(routeSource, /totalRevenue: displayEmployeePerformance\.reduce\(\(sum, e\) => sum \+ e\.totalRevenue, 0\)/);
+  assert.doesNotMatch(routeSource, /totalRevenue: eSales/);
+  assert.match(routeSource, /revenueAfterCommission/);
+  assert.match(dashboardSource, /Tổng doanh số \(Giá HĐ\)/i);
+  assert.match(dashboardSource, /Doanh thu AHS/i);
+  assert.match(dashboardSource, /Doanh thu sau hoa hồng/i);
+  assert.match(dashboardSource, /Doanh thu bình quân\/GD/i);
+
+  const contractWorkflowSource = fs.readFileSync(new URL('../../src/components/ContractWorkflow.tsx', import.meta.url), 'utf8');
+  assert.match(contractWorkflowSource, /doanhthu: investorFormData\.doanhthu/);
+  assert.match(contractWorkflowSource, /Doanh Thu Thực Nhận Từ Giao Dịch/i);
+
+  const modalSource = fs.readFileSync(new URL('../../src/components/ComprehensiveContractModal.tsx', import.meta.url), 'utf8');
+  assert.match(modalSource, /doanhthu: e\.target\.value === '' \? null : Number\(e\.target\.value\)/);
+  assert.match(modalSource, /doanhso: Number\(contract\.giahopdong \?\? contract\.agreedPrice/);
+
+  const approveSource = fs.readFileSync(new URL('../../src/app/api/v1/contracts/[id]/approve/route.ts', import.meta.url), 'utf8');
+  assert.match(approveSource, /const calculatedSales = getContractSales\(\{ \.\.\.contract, \.\.\.contractData \}\)/);
+  assert.match(approveSource, /giahopdong: calculatedSales/);
+  assert.match(approveSource, /doanhso: calculatedSales/);
+});
+
 test('bank webhook waits for Sales Admin before finalizing the product', () => {
   const source = fs.readFileSync(new URL('../../src/app/api/v1/payments/webhooks/vietqr/route.ts', import.meta.url), 'utf8');
   assert.match(source, /status: 'REVIEW_REQUIRED'/);

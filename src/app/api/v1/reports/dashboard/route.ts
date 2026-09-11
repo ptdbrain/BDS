@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { sweepExpiredLocks } from '@/lib/locks';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
-import { sumExplicitAmounts } from '@/lib/contractFinancialPolicy';
+import { calculateFinancialTotals } from '@/lib/reportFinancials';
 
 export const dynamic = 'force-dynamic';
 
@@ -106,20 +106,18 @@ export async function GET(request: Request) {
 
     // -------------------------------------------------------------
     // FINANCIAL CALCULATIONS THEO QUY TẮC MỚI:
-    // 1. Doanh số = giá trị căn bán được theo hợp đồng (hệ thống tự động ghi nhận)
-    // 2. Doanh thu = số tiền AHS thực tế thu được từ CĐT (Sales Admin nhập, chỉ Ban lãnh đạo xem)
-    // 3. Hoa hồng = Sales Admin cập nhật, NVKD được xem hoa hồng của chính mình
+    // 1. DoanhSo = GiaHopDong (hệ thống tự động ghi nhận)
+    // 2. DoanhThu = tiền thực nhận từ giao dịch (Sales Admin nhập)
+    // 3. HoaHong = Sales Admin nhập/cập nhật; không tự áp tỷ lệ dự án
     // -------------------------------------------------------------
-    const totalContractSales = filteredContracts.reduce(
-      (acc, c) => acc + (c.doanhso || c.giahopdong || c.agreedPrice || 0),
-      0
-    );
-
-    const totalCompanyRevenue = sumExplicitAmounts(filteredContracts, 'doanhthu');
-    const totalCommission = filteredContracts.reduce(
-      (acc, c) => acc + Number(c.hoahong ?? c.commissionAmount ?? 0),
-      0
-    );
+    const {
+      totalSales: totalContractSales,
+      totalRevenue: totalCompanyRevenue,
+      totalCommission,
+      revenueAfterCommission: totalRevenueAfterCommission,
+      avgSalesPerTransaction: avgSalesPerContract,
+      avgRevenuePerTransaction: avgRevenuePerContract
+    } = calculateFinancialTotals(filteredContracts);
 
     // Filter payments in date range
     const filteredPayments = succeededPayments.filter(p => {
@@ -135,11 +133,12 @@ export async function GET(request: Request) {
     const myContracts = filteredContracts.filter(
       c => c.salesEmployee?.employeeCode === employeeCode || c.salesEmployeeId === employeeCode
     );
-    const mySales = myContracts.reduce((acc, c) => acc + (c.doanhso || c.giahopdong || c.agreedPrice || 0), 0);
-    const myCommission = myContracts.reduce((acc, c) => acc + Number(c.hoahong ?? c.commissionAmount ?? 0), 0);
+    const myTotals = calculateFinancialTotals(myContracts);
+    const mySales = myTotals.totalSales;
+    const myCommission = myTotals.totalCommission;
 
     // -------------------------------------------------------------
-    // 1. BÁO CÁO 1: BC_DoanhThu (Báo cáo doanh thu thuần CĐT theo thời gian)
+    // 1. BÁO CÁO 1: BC_DoanhThu (DoanhThu thực nhận theo thời gian)
     // CHỈ BAN LÃNH ĐẠO (MANAGER) ĐƯỢC PHÉP TRUY CẬP
     // -------------------------------------------------------------
     const startM = startDateObj ? (startDateObj.getMonth() + 1) : 1;
@@ -156,10 +155,11 @@ export async function GET(request: Request) {
           return dateObj.getFullYear() === 2026 && dateObj.getMonth() + 1 === m;
         });
 
-        const mCount = monthContracts.length;
-        const mSales = monthContracts.reduce((sum, c) => sum + (c.doanhso || c.giahopdong || c.agreedPrice || 0), 0);
-        const mRevenue = sumExplicitAmounts(monthContracts, 'doanhthu');
-        const mAvg = mCount > 0 ? Math.round(mRevenue / mCount) : 0;
+        const monthTotals = calculateFinancialTotals(monthContracts);
+        const mCount = monthTotals.transactionCount;
+        const mSales = monthTotals.totalSales;
+        const mRevenue = monthTotals.totalRevenue;
+        const mCommission = monthTotals.totalCommission;
         const mShare = totalCompanyRevenue > 0 ? (mRevenue / totalCompanyRevenue) : 0;
 
         let notes = '';
@@ -173,9 +173,14 @@ export async function GET(request: Request) {
           month: monthStr,
           monthNum: m,
           contractsCount: mCount,
-          sales: mSales, // Doanh số bán hàng (giá trị căn)
-          revenue: mRevenue, // Doanh thu thực tế AHS thu từ CĐT
-          avgContractValue: mAvg,
+          successfulDepositCount: mCount,
+          totalSales: mSales,
+          sales: mSales,
+          revenue: mRevenue,
+          commission: mCommission,
+          revenueAfterCommission: monthTotals.revenueAfterCommission,
+          avgSalesPerTransaction: monthTotals.avgSalesPerTransaction,
+          avgRevenuePerTransaction: monthTotals.avgRevenuePerTransaction,
           revenueShare: mShare,
           notes
         });
@@ -197,10 +202,13 @@ export async function GET(request: Request) {
     };
 
     const bcDoanhThuSummary = canViewCompanyRevenue ? {
-      totalRevenue: totalCompanyRevenue, // Doanh thu thực tế thu từ CĐT
-      totalSales: totalContractSales,    // Doanh số bán hàng theo HĐ
+      totalSales: totalContractSales,
+      totalRevenue: totalCompanyRevenue,
+      totalCommission,
+      revenueAfterCommission: totalRevenueAfterCommission,
       totalContracts: filteredContracts.length,
-      avgContractValue: filteredContracts.length > 0 ? Math.round(totalContractSales / filteredContracts.length) : 0,
+      avgSalesPerTransaction: avgSalesPerContract,
+      avgRevenuePerTransaction: avgRevenuePerContract,
       companyInfo: {
         name: 'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS (AHS PROPERTY)',
         address: 'Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
@@ -266,10 +274,7 @@ export async function GET(request: Request) {
     // -------------------------------------------------------------
     const allEmployeePerformance = employees.map(emp => {
       const empContracts = filteredContracts.filter(c => c.salesEmployeeId === emp.id || c.salesEmployee?.employeeCode === emp.employeeCode);
-      const eSales = empContracts.reduce((sum, c) => sum + (c.doanhso || c.giahopdong || c.agreedPrice || 0), 0);
-      const eCommission = empContracts.reduce((sum, c) => sum + Number(c.hoahong ?? c.commissionAmount ?? 0), 0);
-      const eCount = empContracts.length;
-      const eAvg = eCount > 0 ? Math.round(eSales / eCount) : 0;
+      const employeeTotals = calculateFinancialTotals(empContracts);
 
       return {
         employeeId: emp.id,
@@ -277,11 +282,13 @@ export async function GET(request: Request) {
         fullName: emp.fullName,
         jobTitle: emp.jobTitle,
         departmentName: emp.department?.name || 'Phòng Kinh doanh',
-        contractsCount: eCount,
-        totalSales: eSales,
-        totalRevenue: eSales, // Alias for backward compatibility
-        totalCommission: eCommission,
-        avgRevenuePerContract: eAvg
+        contractsCount: employeeTotals.transactionCount,
+        totalSales: employeeTotals.totalSales,
+        totalRevenue: employeeTotals.totalRevenue,
+        totalCommission: employeeTotals.totalCommission,
+        revenueAfterCommission: employeeTotals.revenueAfterCommission,
+        avgSalesPerContract: employeeTotals.avgSalesPerTransaction,
+        avgRevenuePerContract: employeeTotals.avgRevenuePerTransaction
       };
     });
 
@@ -303,10 +310,14 @@ export async function GET(request: Request) {
     const bcDoanhSoNVSummary = isProductAdmin ? null : {
       totalContracts: displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0),
       totalSales: displayEmployeePerformance.reduce((sum, e) => sum + e.totalSales, 0),
-      totalRevenue: displayEmployeePerformance.reduce((sum, e) => sum + e.totalSales, 0),
+      totalRevenue: displayEmployeePerformance.reduce((sum, e) => sum + e.totalRevenue, 0),
       totalCommission: displayEmployeePerformance.reduce((sum, e) => sum + e.totalCommission, 0),
-      avgRevenuePerContract: displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0) > 0
+      revenueAfterCommission: displayEmployeePerformance.reduce((sum, e) => sum + e.revenueAfterCommission, 0),
+      avgSalesPerContract: displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0) > 0
         ? Math.round(displayEmployeePerformance.reduce((sum, e) => sum + e.totalSales, 0) / displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0))
+        : 0,
+      avgRevenuePerContract: displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0) > 0
+        ? Math.round(displayEmployeePerformance.reduce((sum, e) => sum + e.totalRevenue, 0) / displayEmployeePerformance.reduce((sum, e) => sum + e.contractsCount, 0))
         : 0
     };
 
@@ -333,7 +344,7 @@ export async function GET(request: Request) {
           // 1. DOANH SỐ = Giá trị căn bán được theo hợp đồng (Hệ thống tự động ghi nhận)
           totalContractSales: isManager ? totalContractSales : null,
           totalContractRevenue: isManager ? totalContractSales : null, // Alias
-          // 2. DOANH THU = Số tiền AHS thực tế thu được từ CĐT (CHỈ Ban Lãnh Đạo xem)
+          // 2. DOANH THU = Số tiền thực nhận từ giao dịch (CHỈ Ban Lãnh Đạo xem)
           totalCompanyRevenue: canViewCompanyRevenue ? totalCompanyRevenue : null,
           // 3. HOA HỒNG = Sales Admin cập nhật, NVKD xem hoa hồng của chính mình
           totalCommission: isProductAdmin ? null : (canViewCompanyRevenue || isSalesAdmin ? totalCommission : (isSales ? myCommission : null)),
@@ -353,7 +364,7 @@ export async function GET(request: Request) {
           data: monthlyRevenue
         } : {
           isRestricted: true,
-          message: 'Báo cáo Doanh thu thực tế của công ty chỉ dành riêng cho Ban Lãnh Đạo (Giám Đốc). Quyền hạn của bạn không được phép xem doanh thu công ty.',
+          message: 'Báo cáo Doanh thu thực nhận của công ty chỉ dành riêng cho Ban Lãnh Đạo (Giám Đốc). Quyền hạn của bạn không được phép xem doanh thu công ty.',
           summary: null,
           data: []
         },

@@ -179,8 +179,9 @@ export async function POST(request: Request) {
       resolvedPlanId = defaultPlan.id;
     }
 
-    // Resolve accurate agreed price / deal revenue
-    const resolvedPrice = dealRevenue || agreedPrice || product.prices[0]?.amount || 4500000000;
+    // Resolve the contract price once. DoanhSo is always derived from GiaHopDong;
+    // the client-provided doanhso value is intentionally ignored.
+    const resolvedPrice = Number(giahopdong ?? agreedPrice ?? dealRevenue ?? product.prices[0]?.amount ?? 4500000000);
     const validSalesId = await resolveEmployeeId(salesEmployeeId, 'SALES');
 
     // Check if contract exists for this product
@@ -191,6 +192,7 @@ export async function POST(request: Request) {
     if (existingContract) {
       // Update existing contract with investor details
       const contractCount = await db.contract.count();
+      const calculatedSales = Number(giahopdong ?? existingContract.giahopdong ?? existingContract.agreedPrice ?? resolvedPrice);
       const updated = await db.contract.update({
         where: { id: existingContract.id },
         data: {
@@ -198,8 +200,8 @@ export async function POST(request: Request) {
           lockId: lockId || existingContract.lockId,
           salesEmployeeId: validSalesId,
           paymentPlanId: resolvedPlanId,
-          agreedPrice: Number(giahopdong || resolvedPrice),
-          dealRevenue: Number(doanhso || resolvedPrice),
+          agreedPrice: calculatedSales,
+          dealRevenue: calculatedSales,
           signingStatus,
           signedDate: signedDate ? new Date(signedDate) : existingContract.signedDate,
           signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : existingContract.signedAt,
@@ -217,10 +219,10 @@ export async function POST(request: Request) {
           diachiKH: diachiKH || customer?.addressCiphertext || 'Hà Nội',
           hotenKH: hotenKH || customer?.fullName,
           phuonganthanhtoan: phuonganthanhtoan || 'Thanh toán chuẩn theo tiến độ',
-          giahopdong: Number(giahopdong || resolvedPrice),
+          giahopdong: calculatedSales,
           thoigiankiHDMB: signedDate ? new Date(signedDate) : existingContract.signedDate,
           trangthaiHDMB: signingStatus,
-          doanhso: Number(doanhso || giahopdong || resolvedPrice),
+          doanhso: calculatedSales,
           ghichu: ghichu || investorNotes || existingContract.investorNotes || 'Hợp đồng mua bán CĐT'
         },
         include: {
@@ -272,6 +274,7 @@ export async function POST(request: Request) {
     const rand = Math.floor(Math.random() * 8999 + 1000);
     const contractNumber = maHopdong || investorContractNo || `HĐMB-AHS-${product.productCode.replace('-', '')}-${year}-${rand}`;
     const contractCount = await db.contract.count();
+    const calculatedSales = resolvedPrice;
 
     const snapshot = {
       productCode: product.productCode,
@@ -280,8 +283,8 @@ export async function POST(request: Request) {
       area: product.area,
       customerName: hotenKH || customer.fullName,
       customerPhone: sodienthoaiKH || customer.phone,
-      agreedPrice: Number(giahopdong || resolvedPrice),
-      dealRevenue: Number(doanhso || resolvedPrice),
+       agreedPrice: calculatedSales,
+       dealRevenue: calculatedSales,
        ...financialFields,
       createdAt: new Date().toISOString()
     };
@@ -294,8 +297,8 @@ export async function POST(request: Request) {
         lockId,
         salesEmployeeId: validSalesId,
         paymentPlanId: resolvedPlanId,
-        agreedPrice: Number(giahopdong || resolvedPrice),
-        dealRevenue: Number(doanhso || resolvedPrice),
+         agreedPrice: calculatedSales,
+         dealRevenue: calculatedSales,
         signingStatus,
         signedDate: signedDate ? new Date(signedDate) : null,
         signedAt: signingStatus === 'DA_KY' ? (signedDate ? new Date(signedDate) : new Date()) : null,
@@ -317,10 +320,10 @@ export async function POST(request: Request) {
         diachiKH: diachiKH || customer.addressCiphertext || 'Hà Nội',
         hotenKH: hotenKH || customer.fullName,
         phuonganthanhtoan: phuonganthanhtoan || 'Thanh toán chuẩn theo tiến độ',
-        giahopdong: Number(giahopdong || resolvedPrice),
+         giahopdong: calculatedSales,
         thoigiankiHDMB: signedDate ? new Date(signedDate) : null,
         trangthaiHDMB: signingStatus,
-        doanhso: Number(doanhso || giahopdong || resolvedPrice),
+         doanhso: calculatedSales,
        ghichu: ghichu || investorNotes || 'Hợp đồng mua bán chính thức CĐT'
       },
       include: {

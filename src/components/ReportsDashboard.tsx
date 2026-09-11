@@ -162,9 +162,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
   const report1 = currentData?.report1_DoanhThu || {
     summary: {
+        totalSales: 0,
         totalRevenue: 0,
+        totalCommission: 0,
+        revenueAfterCommission: 0,
         totalContracts: 0,
-        avgContractValue: 0,
+        avgSalesPerTransaction: 0,
+        avgRevenuePerTransaction: 0,
       companyInfo: {
         name: 'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS',
         address: 'Tầng 4, Tòa nhà The Legend Tower, số 109 Nguyễn Tuân, Phường Thanh Xuân, Thành phố Hà Nội, Việt Nam',
@@ -191,10 +195,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
   const report3 = currentData?.report3_DoanhSoNV || {
     summary: {
-      totalContracts: 24,
-      totalRevenue: 249474779035,
-      totalCommission: 2494747791,
-      avgRevenuePerContract: 10394782460
+      totalContracts: 0,
+      totalSales: 0,
+      totalRevenue: 0,
+      totalCommission: 0,
+      revenueAfterCommission: 0,
+      avgSalesPerContract: 0,
+      avgRevenuePerContract: 0
     },
     data: []
   };
@@ -211,9 +218,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
   };
 
   const report1Summary = report1.summary || {
+    totalSales: 0,
     totalRevenue: 0,
+    totalCommission: 0,
+    revenueAfterCommission: 0,
     totalContracts: 0,
-    avgContractValue: 0,
+    avgSalesPerTransaction: 0,
+    avgRevenuePerTransaction: 0,
     companyInfo: {
       name: 'Báo cáo sản phẩm AHS',
       address: '',
@@ -226,8 +237,11 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
   };
   const report3Summary = report3.summary || {
     totalContracts: 0,
+    totalSales: 0,
     totalRevenue: 0,
     totalCommission: 0,
+    revenueAfterCommission: 0,
+    avgSalesPerContract: 0,
     avgRevenuePerContract: 0
   };
   const company = report1Summary.companyInfo;
@@ -280,13 +294,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
   // Chart data for Report 3 (Top Employees)
   const employeeChartData = useMemo(() => {
     return (report3.data || [])
-      .filter((e: any) => e.totalRevenue > 0)
-      .sort((a: any, b: any) => b.totalRevenue - a.totalRevenue)
+      .filter((e: any) => e.totalSales > 0)
+      .sort((a: any, b: any) => b.totalSales - a.totalSales)
       .slice(0, 8)
       .map((e: any) => ({
         name: e.fullName.split(' ').slice(-2).join(' '),
         fullName: e.fullName,
-        revenueBillion: Number((e.totalRevenue / 1000000000).toFixed(2)),
+        salesBillion: Number((e.totalSales / 1000000000).toFixed(2)),
         contracts: e.contractsCount
       }));
   }, [report3.data]);
@@ -376,11 +390,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
       ws1.columns = [
         { key: 'c1', width: 16 },
-        { key: 'c2', width: 18 },
-        { key: 'c3', width: 26 },
-        { key: 'c4', width: 26 },
-        { key: 'c5', width: 16 },
-        { key: 'c6', width: 36 }
+        { key: 'c2', width: 22 },
+        { key: 'c3', width: 27 },
+        { key: 'c4', width: 22 },
+        { key: 'c5', width: 24 },
+        { key: 'c6', width: 24 },
+        { key: 'c7', width: 24 }
       ];
 
       // Company info
@@ -401,7 +416,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       // Report Banner
       const bRow1_5 = ws1.addRow(['BÁO CÁO DOANH THU THEO THỜI GIAN']);
       bRow1_5.height = 30;
-      ws1.mergeCells('A5:F5');
+      ws1.mergeCells('A5:G5');
       const bannerCell1 = ws1.getCell('A5');
       bannerCell1.fill = fillBannerNavy;
       bannerCell1.font = bannerTitleFont;
@@ -409,7 +424,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
       const bRow1_6 = ws1.addRow([`Kỳ thống kê: ${company.period}   |   Người lập: ${company.creator}   |   Ngày lập: ${company.createdDate}`]);
       bRow1_6.height = 22;
-      ws1.mergeCells('A6:F6');
+      ws1.mergeCells('A6:G6');
       const subBannerCell1 = ws1.getCell('A6');
       subBannerCell1.fill = fillBannerSub;
       subBannerCell1.font = bannerSubtitleFont;
@@ -420,11 +435,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       // Table Header
       const hRow1 = ws1.addRow([
         'Tháng',
-        'Số hợp đồng',
-        'Doanh thu (VNĐ)',
-        'Giá trị HĐ TB (VNĐ)',
-        'Tỷ trọng DT',
-        'Ghi chú'
+        'Số GD cọc thành công',
+        'Tổng doanh số (Giá HĐ)',
+        'Doanh thu AHS',
+        'Tổng hoa hồng NVKD',
+        'Doanh thu sau hoa hồng',
+        'Doanh thu bình quân/GD'
       ]);
       hRow1.height = 28;
       hRow1.eachCell((cell) => {
@@ -438,11 +454,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       (report1.data || []).forEach((m: any, idx: number) => {
         const row = ws1.addRow([
           m.month,
-          Number(m.contractsCount) || 0,
+          Number(m.successfulDepositCount ?? m.contractsCount) || 0,
+          Number(m.totalSales) || 0,
           Number(m.revenue) || 0,
-          Number(m.avgContractValue) || 0,
-          Number(m.revenueShare) || 0,
-          m.notes || ''
+          Number(m.commission) || 0,
+          Number(m.revenueAfterCommission) || 0,
+          Number(m.avgRevenuePerTransaction) || 0
         ]);
         row.height = 23;
         const isOdd = idx % 2 === 1;
@@ -453,34 +470,19 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         c1.alignment = { horizontal: 'center', vertical: 'middle' };
         c1.font = dataCellBoldFont;
 
-        // Cell 2: Contract Count
+        // Cell 2: Successful deposit transactions
         const c2 = row.getCell(2);
         c2.alignment = { horizontal: 'right', vertical: 'middle' };
         c2.numFmt = '#,##0';
         c2.font = dataCellFont;
 
-        // Cell 3: Revenue
-        const c3 = row.getCell(3);
-        c3.alignment = { horizontal: 'right', vertical: 'middle' };
-        c3.numFmt = '#,##0 "₫"';
-        c3.font = dataCellBoldFont;
-
-        // Cell 4: Avg Contract Value
-        const c4 = row.getCell(4);
-        c4.alignment = { horizontal: 'right', vertical: 'middle' };
-        c4.numFmt = '#,##0 "₫"';
-        c4.font = dataCellFont;
-
-        // Cell 5: Revenue Share
-        const c5 = row.getCell(5);
-        c5.alignment = { horizontal: 'right', vertical: 'middle' };
-        c5.numFmt = '0.0%';
-        c5.font = dataCellFont;
-
-        // Cell 6: Notes
-        const c6 = row.getCell(6);
-        c6.alignment = { horizontal: 'left', vertical: 'middle' };
-        c6.font = dataCellFont;
+        // Cells 3-7: separated sales, revenue, commission, net revenue, and average revenue
+        for (let i = 3; i <= 7; i++) {
+          const cell = row.getCell(i);
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0 "₫"';
+          cell.font = i === 3 || i === 4 ? dataCellBoldFont : dataCellFont;
+        }
 
         row.eachCell((cell) => {
           cell.fill = currentFill;
@@ -490,12 +492,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
       // Total Row
       const totRow1 = ws1.addRow([
-        'TỔNG CỘNG',
+        'TỔNG',
         Number(report1Summary.totalContracts) || 0,
+        Number(report1Summary.totalSales) || 0,
         Number(report1Summary.totalRevenue) || 0,
-        Number(report1Summary.avgContractValue) || 0,
-        1,
-        ''
+        Number(report1Summary.totalCommission) || 0,
+        Number(report1Summary.revenueAfterCommission) || 0,
+        Number(report1Summary.avgRevenuePerTransaction) || 0
       ]);
       totRow1.height = 26;
       totRow1.eachCell((cell, colNumber) => {
@@ -507,14 +510,9 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         } else if (colNumber === 2) {
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           cell.numFmt = '#,##0';
-        } else if (colNumber === 3 || colNumber === 4) {
+        } else {
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           cell.numFmt = '#,##0 "₫"';
-        } else if (colNumber === 5) {
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          cell.numFmt = '0.0%';
-        } else {
-          cell.alignment = { horizontal: 'left', vertical: 'middle' };
         }
       });
 
@@ -691,8 +689,10 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         { key: 'c3', width: 24 },
         { key: 'c4', width: 16 },
         { key: 'c5', width: 26 },
-        { key: 'c6', width: 24 },
-        { key: 'c7', width: 24 }
+        { key: 'c6', width: 22 },
+        { key: 'c7', width: 24 },
+        { key: 'c8', width: 26 },
+        { key: 'c9', width: 26 }
       ];
 
       // Company info
@@ -713,7 +713,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       // Report Banner
       const bRow3_5 = ws3.addRow(['BÁO CÁO DOANH SỐ THEO NHÂN VIÊN']);
       bRow3_5.height = 30;
-      ws3.mergeCells('A5:G5');
+      ws3.mergeCells('A5:I5');
       const bannerCell3 = ws3.getCell('A5');
       bannerCell3.fill = fillBannerNavy;
       bannerCell3.font = bannerTitleFont;
@@ -721,7 +721,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
       const bRow3_6 = ws3.addRow([`Kỳ thống kê: ${company.period}   |   Người lập: ${company.creator}   |   Ngày lập: ${company.createdDate}`]);
       bRow3_6.height = 22;
-      ws3.mergeCells('A6:G6');
+      ws3.mergeCells('A6:I6');
       const subBannerCell3 = ws3.getCell('A6');
       subBannerCell3.fill = fillBannerSub;
       subBannerCell3.font = bannerSubtitleFont;
@@ -734,10 +734,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         'Mã NV',
         'Họ tên nhân viên',
         'Chức vụ',
-        'Số hợp đồng',
-        'Tổng doanh số (VNĐ)',
-        'Tổng hoa hồng (VNĐ)',
-        'Doanh số / HĐ (VNĐ)'
+        'Số GD',
+        'Doanh số (Giá HĐ)',
+        'Doanh thu AHS',
+        'Hoa hồng NVKD',
+        'Doanh thu sau hoa hồng',
+        'Doanh số bình quân/GD'
       ]);
       hRow3.height = 28;
       hRow3.eachCell((cell) => {
@@ -754,9 +756,11 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
           e.fullName,
           e.jobTitle,
           Number(e.contractsCount) || 0,
+          Number(e.totalSales) || 0,
           Number(e.totalRevenue) || 0,
           Number(e.totalCommission) || 0,
-          Number(e.avgRevenuePerContract) || 0
+          Number(e.revenueAfterCommission) || 0,
+          Number(e.avgSalesPerContract) || 0
         ]);
         row.height = 23;
         const isOdd = idx % 2 === 1;
@@ -783,23 +787,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         c4.numFmt = '#,##0';
         c4.font = dataCellFont;
 
-        // Cell 5: Total Revenue
-        const c5 = row.getCell(5);
-        c5.alignment = { horizontal: 'right', vertical: 'middle' };
-        c5.numFmt = '#,##0 "₫"';
-        c5.font = dataCellBoldFont;
-
-        // Cell 6: Total Commission (Emerald green accent)
-        const c6 = row.getCell(6);
-        c6.alignment = { horizontal: 'right', vertical: 'middle' };
-        c6.numFmt = '#,##0 "₫"';
-        c6.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF047857' } };
-
-        // Cell 7: Avg Revenue Per Contract
-        const c7 = row.getCell(7);
-        c7.alignment = { horizontal: 'right', vertical: 'middle' };
-        c7.numFmt = '#,##0 "₫"';
-        c7.font = dataCellFont;
+        // Cells 5-9: separated sales, revenue, commission, net revenue, and sales average
+        for (let i = 5; i <= 9; i++) {
+          const cell = row.getCell(i);
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          cell.numFmt = '#,##0 "₫"';
+          cell.font = i === 5 || i === 6 ? dataCellBoldFont : dataCellFont;
+        }
 
         row.eachCell((cell) => {
           cell.fill = currentFill;
@@ -813,9 +807,11 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
         '',
         '',
         Number(report3Summary.totalContracts) || 0,
+        Number(report3Summary.totalSales) || 0,
         Number(report3Summary.totalRevenue) || 0,
         Number(report3Summary.totalCommission) || 0,
-        Number(report3Summary.avgRevenuePerContract) || 0
+        Number(report3Summary.revenueAfterCommission) || 0,
+        Number(report3Summary.avgSalesPerContract) || 0
       ]);
       totRow3.height = 26;
       totRow3.eachCell((cell, colNumber) => {
@@ -1146,7 +1142,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
               <div>
                 <h3 className="text-xl font-black text-red-300 uppercase tracking-wider">🔒 Nội Dung Được Bảo Mật</h3>
                 <p className="text-sm text-slate-400 mt-3 max-w-lg">
-                  Báo cáo Doanh thu thực tế của công ty (AHS thu từ Chủ đầu tư) chỉ dành riêng cho <strong className="text-amber-300">Ban Lãnh Đạo</strong>.
+                  Báo cáo Doanh thu thực nhận từ giao dịch chỉ dành riêng cho <strong className="text-amber-300">Ban Lãnh Đạo</strong>.
                 </p>
                 <p className="text-xs text-slate-500 mt-2">Tài khoản của bạn không có quyền xem mục này. Vui lòng liên hệ Ban Lãnh Đạo nếu cần thông tin.</p>
               </div>
@@ -1158,15 +1154,15 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
           ) : (
           <>
           {/* KPI Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
-              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Tổng Doanh Thu Hợp Đồng</span>
+              <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Tổng Doanh Thu AHS</span>
               <div className="text-3xl font-black text-emerald-400 font-mono mt-2 tracking-tight">
                 {formatVND(report1Summary.totalRevenue)}
               </div>
               <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
-                <span>Tương đương:</span>
+                <span>Tiền thực nhận từ giao dịch:</span>
                 <span className="font-bold text-emerald-300 font-mono">~ {formatBillion(report1Summary.totalRevenue)}</span>
               </div>
             </div>
@@ -1186,13 +1182,13 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
 
             <div className="relative overflow-hidden rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-950/30 via-slate-900/80 to-slate-900/90 p-6 shadow-xl backdrop-blur-xl group hover:border-purple-500/50 transition-all">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
-              <span className="text-[11px] font-black text-purple-400 uppercase tracking-widest">Giá Trị HĐ Bình Quân</span>
+              <span className="text-[11px] font-black text-purple-400 uppercase tracking-widest">Doanh Thu Bình Quân/GD</span>
               <div className="text-3xl font-black text-purple-300 font-mono mt-2 tracking-tight">
-                {formatVND(report1Summary.avgContractValue)}
+                {formatVND(report1Summary.avgRevenuePerTransaction)}
               </div>
               <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
-                <span>Mức trung bình:</span>
-                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report1Summary.avgContractValue)} / HĐ</span>
+                <span>Tiền thực nhận trung bình:</span>
+                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report1Summary.avgRevenuePerTransaction)} / GD</span>
               </div>
             </div>
           </div>
@@ -1202,14 +1198,14 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                  Biểu Đồ Doanh Thu & Số Hợp Đồng 12 Tháng Năm 2026
+                   Biểu Đồ Doanh Thu AHS & Số Giao Dịch Theo Tháng
                 </h3>
-                <p className="text-xs text-slate-400">Phân bổ doanh số thực tế từ Hợp đồng mua bán</p>
+                 <p className="text-xs text-slate-400">Doanh số là giá trị hợp đồng; doanh thu là tiền Sales Admin ghi nhận thực nhận</p>
               </div>
               <div className="flex items-center space-x-4 text-xs">
                 <span className="flex items-center space-x-1 text-emerald-400">
                   <span className="w-3 h-3 rounded bg-emerald-500"></span>
-                  <span>Doanh thu (Tỷ VND)</span>
+                   <span>Doanh thu AHS (Tỷ VND)</span>
                 </span>
                 <span className="flex items-center space-x-1 text-amber-400">
                   <span className="w-3 h-3 rounded-full bg-amber-400"></span>
@@ -1253,11 +1249,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                 <thead className="bg-slate-900 text-slate-400 font-bold border-b border-slate-800">
                   <tr>
                     <th className="p-3.5">Tháng</th>
-                    <th className="p-3.5 text-right">Số Hợp Đồng</th>
-                    <th className="p-3.5 text-right">Doanh Thu (VND)</th>
-                    <th className="p-3.5 text-right">Giá Trị HĐ Bình Quân (VND)</th>
-                    <th className="p-3.5 text-right">Tỷ Trọng DT (%)</th>
-                    <th className="p-3.5">Ghi Chú</th>
+                    <th className="p-3.5 text-right">Số GD cọc thành công</th>
+                    <th className="p-3.5 text-right">Tổng doanh số (Giá HĐ)</th>
+                    <th className="p-3.5 text-right">Doanh thu AHS</th>
+                    <th className="p-3.5 text-right">Tổng hoa hồng NVKD</th>
+                    <th className="p-3.5 text-right">Doanh thu sau hoa hồng</th>
+                    <th className="p-3.5 text-right">Doanh thu bình quân/GD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/80 text-slate-200">
@@ -1265,39 +1262,47 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                     <tr key={m.month} className={`hover:bg-slate-800/40 transition ${m.revenue > 0 ? 'bg-slate-900/30' : ''}`}>
                       <td className="p-3.5 font-bold text-white font-mono">{m.month}</td>
                       <td className="p-3.5 text-right font-mono font-semibold text-slate-200">
-                        {m.contractsCount}
+                        {m.successfulDepositCount ?? m.contractsCount}
                       </td>
                       <td className="p-3.5 text-right font-mono font-bold text-emerald-400">
-                        {formatVND(m.revenue)}
+                        {formatVND(m.totalSales)}
                       </td>
                       <td className="p-3.5 text-right font-mono text-slate-300">
-                        {formatVND(m.avgContractValue)}
+                        {formatVND(m.revenue)}
                       </td>
                       <td className="p-3.5 text-right font-mono text-cyan-400 font-semibold">
-                        {(m.revenueShare * 100).toFixed(2)}%
+                        {formatVND(m.commission)}
                       </td>
-                      <td className="p-3.5 text-slate-400 text-[11px] italic">
-                        {m.notes || '—'}
+                      <td className="p-3.5 text-right font-mono text-amber-300 font-semibold">
+                        {formatVND(m.revenueAfterCommission)}
+                      </td>
+                      <td className="p-3.5 text-right font-mono text-purple-300">
+                        {formatVND(m.avgRevenuePerTransaction)}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot className="bg-slate-900/90 font-black border-t-2 border-slate-700 text-white">
                   <tr>
-                    <td className="p-4 uppercase text-brand-400">TỔNG CỘNG</td>
+                    <td className="p-4 uppercase text-brand-400">TỔNG</td>
                     <td className="p-4 text-right font-mono text-amber-400 text-sm">
                       {report1Summary.totalContracts}
+                    </td>
+                    <td className="p-4 text-right font-mono text-brand-300 text-sm">
+                      {formatVND(report1Summary.totalSales)}
                     </td>
                     <td className="p-4 text-right font-mono text-emerald-400 text-sm">
                       {formatVND(report1Summary.totalRevenue)}
                     </td>
+                    <td className="p-4 text-right font-mono text-cyan-400 text-sm">
+                      {formatVND(report1Summary.totalCommission)}
+                    </td>
+                    <td className="p-4 text-right font-mono text-amber-300 text-sm">
+                      {formatVND(report1Summary.revenueAfterCommission)}
+                    </td>
                     <td className="p-4 text-right font-mono text-purple-300">
-                      {formatVND(report1Summary.avgContractValue)}
+                      {formatVND(report1Summary.avgRevenuePerTransaction)}
                     </td>
-                    <td className="p-4 text-right font-mono text-cyan-400">
-                      100.00%
-                    </td>
-                    <td className="p-4 text-slate-500 text-[11px]">Toàn hệ thống</td>
                   </tr>
                 </tfoot>
               </table>
@@ -1492,28 +1497,40 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       {activeTab === 'bc_doanhso_nv' && (
         <div className="space-y-6">
           {/* KPI Indicators */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-emerald-500/50 transition-all">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400"></div>
               <span className="text-[11px] font-black text-emerald-400 uppercase tracking-widest">Tổng Doanh Số Nhân Viên</span>
               <div className="text-3xl font-black text-emerald-400 font-mono mt-2 tracking-tight">
-                {formatVND(report3Summary.totalRevenue)}
+                {formatVND(report3Summary.totalSales)}
               </div>
               <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
                 <span>Nguồn hợp đồng:</span>
-                <span className="font-bold text-emerald-300 font-mono">24 HĐ giao dịch</span>
+                <span className="font-bold text-emerald-300 font-mono">{report3Summary.totalContracts} giao dịch</span>
               </div>
             </div>
 
             <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-amber-500/50 transition-all">
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-400"></div>
-              <span className="text-[11px] font-black text-amber-400 uppercase tracking-widest">Tổng Hoa Hồng Kinh Doanh (1%)</span>
+              <span className="text-[11px] font-black text-amber-400 uppercase tracking-widest">Tổng Doanh Thu AHS</span>
               <div className="text-3xl font-black text-amber-400 font-mono mt-2 tracking-tight">
+                {formatVND(report3Summary.totalRevenue)}
+              </div>
+              <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
+                <span>Tiền thực nhận:</span>
+                <span className="font-bold text-amber-300">Sales Admin nhập</span>
+              </div>
+            </div>
+
+            <div className="relative overflow-hidden rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-950/30 via-slate-900/80 to-slate-950 p-6 shadow-xl backdrop-blur-xl group hover:border-cyan-500/50 transition-all">
+              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-500 to-blue-400"></div>
+              <span className="text-[11px] font-black text-cyan-400 uppercase tracking-widest">Tổng Hoa Hồng NVKD</span>
+              <div className="text-3xl font-black text-cyan-400 font-mono mt-2 tracking-tight">
                 {formatVND(report3Summary.totalCommission)}
               </div>
               <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
-                <span>Chế độ thưởng:</span>
-                <span className="font-bold text-amber-300">Chi trả chuyên viên KD</span>
+                <span>Trạng thái:</span>
+                <span className="font-bold text-cyan-300">Sales Admin cập nhật</span>
               </div>
             </div>
 
@@ -1521,11 +1538,11 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
               <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500 to-indigo-400"></div>
               <span className="text-[11px] font-black text-purple-400 uppercase tracking-widest">Doanh Số Bình Quân / HĐ</span>
               <div className="text-3xl font-black text-purple-300 font-mono mt-2 tracking-tight">
-                {formatVND(report3Summary.avgRevenuePerContract)}
+                {formatVND(report3Summary.avgSalesPerContract)}
               </div>
               <div className="flex items-center justify-between mt-3 text-xs text-slate-400 pt-2 border-t border-slate-800/60">
                 <span>Quy mô thương vụ:</span>
-                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report3Summary.avgRevenuePerContract)} / HĐ</span>
+                <span className="font-bold text-purple-300 font-mono">~ {formatBillion(report3Summary.avgSalesPerContract)} / GD</span>
               </div>
             </div>
           </div>
@@ -1543,11 +1560,11 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                   <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
                   <XAxis type="number" stroke="#94a3b8" fontSize={11} tickFormatter={(val) => `${val} Tỷ`} />
                   <YAxis type="category" dataKey="name" stroke="#94a3b8" fontSize={11} width={100} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '14px', fontSize: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
-                    formatter={(val: any) => [`${val} Tỷ VND`, 'Tổng doanh số']}
-                  />
-                  <Bar dataKey="revenueBillion" fill="#38bdf8" radius={[0, 8, 8, 0]} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '14px', fontSize: '12px', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.5)' }}
+                        formatter={(val: any) => [`${val} Tỷ VND`, 'Tổng doanh số']}
+                      />
+                      <Bar dataKey="salesBillion" fill="#38bdf8" radius={[0, 8, 8, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -1584,10 +1601,12 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                     <th className="p-4">Mã NV</th>
                     <th className="p-4">Họ Tên Nhân Viên</th>
                     <th className="p-4">Chức Vụ & Phòng Ban</th>
-                    <th className="p-4 text-right">Số HĐ</th>
-                    <th className="p-4 text-right">Tổng Doanh Số (VND)</th>
-                    <th className="p-4 text-right">Hoa Hồng 1% (VND)</th>
-                    <th className="p-4 text-right">Doanh Số / HĐ (VND)</th>
+                        <th className="p-4 text-right">Số GD</th>
+                        <th className="p-4 text-right">Doanh số (Giá HĐ)</th>
+                        <th className="p-4 text-right">Doanh thu AHS</th>
+                        <th className="p-4 text-right">Hoa hồng NVKD</th>
+                        <th className="p-4 text-right">Doanh thu sau hoa hồng</th>
+                        <th className="p-4 text-right">Doanh số bình quân/GD</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-slate-200">
@@ -1628,14 +1647,20 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                         <td className="p-4 text-right font-mono font-bold text-amber-400">
                           {e.contractsCount}
                         </td>
-                        <td className="p-4 text-right font-mono font-bold text-emerald-400">
-                          {formatVND(e.totalRevenue)}
-                        </td>
-                        <td className="p-4 text-right font-mono text-cyan-400 font-semibold">
-                          {formatVND(e.totalCommission)}
-                        </td>
-                        <td className="p-4 text-right font-mono text-slate-300">
-                          {formatVND(e.avgRevenuePerContract)}
+                            <td className="p-4 text-right font-mono font-bold text-brand-300">
+                              {formatVND(e.totalSales)}
+                            </td>
+                            <td className="p-4 text-right font-mono text-emerald-400 font-semibold">
+                              {formatVND(e.totalRevenue)}
+                            </td>
+                            <td className="p-4 text-right font-mono text-cyan-400 font-semibold">
+                              {formatVND(e.totalCommission)}
+                            </td>
+                            <td className="p-4 text-right font-mono text-amber-300 font-semibold">
+                              {formatVND(e.revenueAfterCommission)}
+                            </td>
+                            <td className="p-4 text-right font-mono text-slate-300">
+                              {formatVND(e.avgSalesPerContract)}
                         </td>
                       </tr>
                     );
@@ -1648,13 +1673,19 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                       {report3Summary.totalContracts}
                     </td>
                     <td className="p-4 text-right font-mono text-emerald-400 text-sm">
-                      {formatVND(report3Summary.totalRevenue)}
-                    </td>
-                    <td className="p-4 text-right font-mono text-cyan-300 text-sm">
-                      {formatVND(report3Summary.totalCommission)}
-                    </td>
-                    <td className="p-4 text-right font-mono text-purple-300 text-sm">
-                      {formatVND(report3Summary.avgRevenuePerContract)}
+                        {formatVND(report3Summary.totalSales)}
+                      </td>
+                      <td className="p-4 text-right font-mono text-emerald-400 text-sm">
+                        {formatVND(report3Summary.totalRevenue)}
+                      </td>
+                      <td className="p-4 text-right font-mono text-cyan-300 text-sm">
+                        {formatVND(report3Summary.totalCommission)}
+                      </td>
+                      <td className="p-4 text-right font-mono text-amber-300 text-sm">
+                        {formatVND(report3Summary.revenueAfterCommission)}
+                      </td>
+                      <td className="p-4 text-right font-mono text-purple-300 text-sm">
+                        {formatVND(report3Summary.avgSalesPerContract)}
                     </td>
                   </tr>
                 </tfoot>
@@ -1772,7 +1803,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="font-black text-emerald-400 text-xs font-mono">{formatBillion(emp.totalRevenue)}</div>
+                      <div className="font-black text-emerald-400 text-xs font-mono">{formatBillion(emp.totalSales)}</div>
                       <div className="text-[10px] text-slate-500">Doanh số</div>
                     </div>
                   </div>

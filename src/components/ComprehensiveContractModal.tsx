@@ -70,7 +70,7 @@ export function ComprehensiveContractModal({
   useEffect(() => {
     if (contract) {
       const cust = contract.customer;
-      const basePrice = contract.agreedPrice || activeProduct?.gianiemyet || activeProduct?.prices?.[0]?.amount || 4800000000;
+      const basePrice = contract.giahopdong ?? contract.agreedPrice ?? activeProduct?.gianiemyet ?? activeProduct?.prices?.[0]?.amount ?? 4800000000;
       setFormData({
         maHopdong: contract.maHopdong || contract.contractNumber || `HĐ-${activeProduct?.productCode || 'CAN'}-2026`,
         maKH: contract.maKH || cust?.id?.slice(0, 8).toUpperCase() || 'KH' + Math.floor(100 + Math.random() * 900),
@@ -80,8 +80,8 @@ export function ComprehensiveContractModal({
         emailKH: contract.emailKH || cust?.email || '',
         diachiKH: contract.diachiKH || cust?.addressCiphertext || 'Hà Nội',
         phuonganthanhtoan: contract.phuonganthanhtoan || 'Thanh toán chuẩn',
-        giahopdong: Number(contract.giahopdong || basePrice),
-        doanhso: Number(contract.doanhso || contract.giahopdong || basePrice),
+        giahopdong: Number(contract.giahopdong ?? basePrice),
+        doanhso: Number(contract.giahopdong ?? contract.agreedPrice ?? basePrice),
         doanhthu: contract.doanhthu == null ? null : Number(contract.doanhthu),
         hoahong: contract.hoahong == null ? null : Number(contract.hoahong),
         commissionStatus: contract.commissionStatus || '',
@@ -296,7 +296,7 @@ export function ComprehensiveContractModal({
   const isSales = currentRole === 'SALES';
   const isProductAdmin = currentRole === 'PRODUCT_ADMIN';
 
-  // Doanh thu thực tế AHS thu từ CĐT: CHỈ Ban Lãnh Đạo và Sales Admin được thao tác/xem
+  // Doanh thu thực nhận từ giao dịch: Sales Admin nhập/cập nhật, Manager chỉ xem
   // NVKD và QL Sản Phẩm tuyệt đối không được xem doanh thu của công ty
   const canViewCompanyRevenue = isManager || isSalesAdmin;
 
@@ -577,23 +577,23 @@ export function ComprehensiveContractModal({
                 </p>
               </div>
 
-              {/* 2. Doanh thu: Số tiền AHS thực tế thu từ CĐT (Sales Admin nhập, chỉ Ban Lãnh Đạo xem) */}
+              {/* 2. Doanh thu: tiền thực nhận từ giao dịch (Sales Admin nhập/cập nhật) */}
               {canViewCompanyRevenue ? (
                 <div className="p-3 rounded-xl bg-blue-950/30 border border-blue-500/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <label className="text-blue-300 font-bold text-xs flex items-center gap-1.5">
-                      <span>💵 Doanh Thu Thực Tế AHS Thu Từ CĐT [DoanhThu] (VND)</span>
+                      <span>💵 Doanh Thu Thực Nhận Từ Giao Dịch [DoanhThu] (VND)</span>
                     </label>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-semibold">
-                      Chỉ Ban Lãnh Đạo xem báo cáo
+                      {isSalesAdmin ? 'Sales Admin nhập/cập nhật' : 'Manager chỉ xem'}
                     </span>
                   </div>
                   {isSalesAdmin ? (
                     <input
                       type="number"
                       value={formData.doanhthu ?? ''}
-                      onChange={(e) => setFormData({ ...formData, doanhthu: Number(e.target.value) })}
-                      placeholder="Sales Admin nhập số tiền AHS thực tế thu từ CĐT..."
+                      onChange={(e) => setFormData({ ...formData, doanhthu: e.target.value === '' ? null : Number(e.target.value) })}
+                      placeholder="Sales Admin nhập số tiền thực nhận từ giao dịch..."
                       className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-cyan-300 font-bold text-sm outline-none focus:border-cyan-400"
                     />
                   ) : (
@@ -602,7 +602,7 @@ export function ComprehensiveContractModal({
                     </div>
                   )}
                   <p className="text-[10px] text-slate-400">
-                    * Sales Admin nhập số tiền AHS thực tế thu về từ Chủ đầu tư (NVKD & QL sản phẩm không được xem).
+                    * Sales Admin nhập/cập nhật tiền thực nhận từ giao dịch; Manager chỉ xem, NVKD và QL sản phẩm không được xem.
                   </p>
                 </div>
               ) : null}
@@ -623,7 +623,7 @@ export function ComprehensiveContractModal({
                       <input
                         type="number"
                         value={formData.hoahong ?? ''}
-                        onChange={(e) => setFormData({ ...formData, hoahong: Number(e.target.value) })}
+                         onChange={(e) => setFormData({ ...formData, hoahong: e.target.value === '' ? null : Number(e.target.value) })}
                         placeholder="Số tiền hoa hồng NVKD..."
                         className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-purple-300 font-bold text-sm outline-none"
                       />

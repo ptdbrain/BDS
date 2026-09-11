@@ -5,6 +5,7 @@ import { ensureContractExists } from '@/lib/contractHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { getAuthorizedFinancialFields } from '@/lib/contractFinancialPolicy';
 import { canReviewContract } from '@/lib/rolePolicy';
+import { getContractSales } from '@/lib/reportFinancials';
 
 export async function POST(
   request: Request,
@@ -63,6 +64,7 @@ export async function POST(
     const financialFields = actorRole === 'SALES_ADMIN'
       ? getAuthorizedFinancialFields(actorRole, contractData || {})
       : {};
+    const calculatedSales = getContractSales({ ...contract, ...contractData });
 
     const now = new Date();
 
@@ -76,8 +78,10 @@ export async function POST(
           signedDate: now,
           signedAt: now,
           trangthaiHDMB: 'Đã ký',
-          dealRevenue: contract.dealRevenue ?? contract.agreedPrice,
-          doanhso: contract.doanhso ?? contract.giahopdong ?? contract.agreedPrice,
+          agreedPrice: calculatedSales,
+          giahopdong: calculatedSales,
+          dealRevenue: calculatedSales,
+          doanhso: calculatedSales,
           ...financialFields,
           version: { increment: 1 }
         }

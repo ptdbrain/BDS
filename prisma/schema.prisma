@@ -298,7 +298,7 @@ model Contract {
   thoigiankiHDMB     DateTime?
   trangthaiHDMB      String?
   doanhso            Float?
-  doanhthu           Float?           // Doanh thu thực tế AHS thu được từ Chủ đầu tư (Sales Admin nhập, chỉ Ban Lãnh Đạo xem)
+  doanhthu           Float?           // Doanh thu thực nhận từ giao dịch (Sales Admin nhập/cập nhật)
   hoahong            Float?
   trangthaiThanhtoan String?
   ghichu             String?

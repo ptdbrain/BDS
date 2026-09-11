@@ -124,17 +124,19 @@ export async function PATCH(
     if (diachiKH !== undefined) dataToUpdate.diachiKH = diachiKH;
     if (phuonganthanhtoan !== undefined) dataToUpdate.phuonganthanhtoan = phuonganthanhtoan;
 
-    if (giahopdong !== undefined) {
-      const numPrice = parseFloat(String(giahopdong));
+    const requestedContractPrice = giahopdong !== undefined ? giahopdong : dealRevenue;
+    if (requestedContractPrice !== undefined) {
+      const numPrice = parseFloat(String(requestedContractPrice));
       dataToUpdate.giahopdong = numPrice;
       dataToUpdate.agreedPrice = numPrice;
       dataToUpdate.dealRevenue = numPrice;
       dataToUpdate.doanhso = numPrice;
-    } else if (dealRevenue !== undefined) {
-      const numRevenue = parseFloat(String(dealRevenue));
-      dataToUpdate.dealRevenue = numRevenue;
-      dataToUpdate.giahopdong = numRevenue;
-      dataToUpdate.doanhso = numRevenue;
+    } else {
+      // Keep DoanhSo synchronized with the authoritative GiaHopDong value even
+      // when this request only updates DoanhThu/HoaHong/TrangThaiHoaHong.
+      dataToUpdate.doanhso = Number(
+        existing.giahopdong ?? existing.agreedPrice ?? existing.doanhso ?? existing.dealRevenue ?? 0
+      );
     }
 
     Object.assign(dataToUpdate, financialFields);

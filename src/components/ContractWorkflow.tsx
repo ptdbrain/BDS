@@ -22,6 +22,7 @@ import {
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 import { readJsonResponse } from '@/lib/readJsonResponse';
+import { getContractSales } from '@/lib/reportFinancials';
 
 interface ContractWorkflowProps {
   contracts: any[];
@@ -62,6 +63,7 @@ export function ContractWorkflow({
     signedDate: new Date().toISOString().slice(0, 10),
     signingStatus: 'CHUA_KY', // CHUA_KY, DA_KY, CHAM_KY
     dealRevenue: '4800000000',
+    doanhthu: '',
     commissionStatus: '',
     commissionDueDate: '',
     commissionAmount: '',
@@ -92,6 +94,7 @@ export function ContractWorkflow({
       signedDate: new Date().toISOString().slice(0, 10),
       signingStatus: 'CHUA_KY',
       dealRevenue: String(estimatedRevenue),
+      doanhthu: '',
       commissionStatus: '',
       commissionDueDate: '',
       commissionAmount: '',
@@ -111,7 +114,8 @@ export function ContractWorkflow({
       investorContractNo: ct.investorContractNo || ct.contractNumber,
       signedDate: ct.signedDate ? new Date(ct.signedDate).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
       signingStatus: ct.signingStatus || (ct.status === 'SIGNED' ? 'DA_KY' : 'CHUA_KY'),
-      dealRevenue: String(ct.dealRevenue || ct.agreedPrice || 4800000000),
+      dealRevenue: String(ct.giahopdong ?? ct.agreedPrice ?? 4800000000),
+      doanhthu: ct.doanhthu == null ? '' : String(ct.doanhthu),
       commissionStatus: ct.commissionStatus || 'DU_KIEN_TRA',
       commissionDueDate: ct.commissionDueDate || '25/10/2026',
       commissionAmount: String(ct.commissionAmount ?? ''),
@@ -141,7 +145,8 @@ export function ContractWorkflow({
             investorContractNo: investorFormData.investorContractNo,
             signedDate: investorFormData.signedDate,
             signingStatus: investorFormData.signingStatus,
-            dealRevenue: parseFloat(investorFormData.dealRevenue),
+            giahopdong: parseFloat(investorFormData.dealRevenue),
+            doanhthu: investorFormData.doanhthu === '' ? null : parseFloat(investorFormData.doanhthu),
             commissionStatus: investorFormData.commissionStatus,
             commissionDueDate: investorFormData.commissionDueDate,
             commissionAmount: investorFormData.commissionAmount === '' ? null : parseFloat(investorFormData.commissionAmount),
@@ -167,7 +172,8 @@ export function ContractWorkflow({
             investorContractNo: investorFormData.investorContractNo,
             signedDate: investorFormData.signedDate,
             signingStatus: investorFormData.signingStatus,
-            dealRevenue: parseFloat(investorFormData.dealRevenue),
+            giahopdong: parseFloat(investorFormData.dealRevenue),
+            doanhthu: investorFormData.doanhthu === '' ? null : parseFloat(investorFormData.doanhthu),
             commissionStatus: investorFormData.commissionStatus,
             commissionDueDate: investorFormData.commissionDueDate,
             commissionAmount: investorFormData.commissionAmount === '' ? null : parseFloat(investorFormData.commissionAmount),
@@ -198,7 +204,7 @@ export function ContractWorkflow({
   const isSales = currentRole === 'SALES';
   const isProductAdmin = currentRole === 'PRODUCT_ADMIN';
 
-  // Doanh thu thực tế AHS thu từ CĐT: CHỈ Ban Lãnh Đạo và Sales Admin được xem
+  // Doanh thu thực nhận từ giao dịch: Sales Admin nhập/cập nhật, Manager chỉ xem
   // NVKD và QL Sản Phẩm tuyệt đối không được xem doanh thu của công ty
   const canViewCompanyRevenue = isManager || currentRole === 'SALES_ADMIN';
 
@@ -219,7 +225,7 @@ export function ContractWorkflow({
                 </span>
               </div>
               <p className="text-xs text-slate-400">
-                Doanh số tự động ghi nhận theo hợp đồng • Doanh thu CĐT và Hoa hồng do Sales Admin cập nhật
+                DoanhSo tự động theo GiaHopDong • DoanhThu và HoaHong do Sales Admin nhập/cập nhật
               </p>
             </div>
           </div>
@@ -258,7 +264,7 @@ export function ContractWorkflow({
                 <th className="p-3.5">Thời Gian Ký</th>
                 <th className="p-3.5">Trạng Thái Ký</th>
                 <th className="p-3.5">Doanh Số (Theo HĐ)</th>
-                {canViewCompanyRevenue && <th className="p-3.5 text-cyan-400">Doanh Thu CĐT</th>}
+                {canViewCompanyRevenue && <th className="p-3.5 text-cyan-400">Doanh Thu AHS (GD)</th>}
                 <th className="p-3.5">Thanh Toán Hoa Hồng</th>
                 <th className="p-3.5 text-right">Thao Tác</th>
               </tr>
@@ -274,7 +280,7 @@ export function ContractWorkflow({
                 contracts.map((ct) => {
                   const signingStatus = ct.signingStatus || (ct.status === 'SIGNED' ? 'DA_KY' : 'CHUA_KY');
                   const commissionStatus = ct.commissionStatus || '';
-                  const salesAmount = ct.doanhso || ct.giahopdong || ct.agreedPrice || 4800000000;
+                  const salesAmount = getContractSales(ct);
                   const companyRevenue = ct.doanhthu;
                   const isMyContract = ct.salesEmployee?.employeeCode === currentUser?.employeeCode ||
                                        ct.salesEmployeeId === currentUser?.id;
@@ -342,7 +348,7 @@ export function ContractWorkflow({
                       {canViewCompanyRevenue && (
                         <td className="p-3.5 font-bold text-cyan-400">
                           {companyRevenue == null ? 'Chưa cập nhật' : Number(companyRevenue).toLocaleString('vi-VN') + ' VND'}
-                          <div className="text-[10px] text-slate-500 font-normal">AHS thực thu CĐT</div>
+                              <div className="text-[10px] text-slate-500 font-normal">Tiền thực nhận từ giao dịch</div>
                         </td>
                       )}
                       <td className="p-3.5">
@@ -534,16 +540,15 @@ export function ContractWorkflow({
                   </select>
                 </div>
 
-                {/* 6. Doanh Số Của Giao Dịch */}
+                {/* 6. GiaHopDong; DoanhSo được hệ thống tự động ghi nhận */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">6. Doanh Số Giao Dịch (VND) (*)</label>
+                  <label className="block text-slate-300 font-bold mb-1">6. Giá Trị Hợp Đồng [GiaHopDong] (VND) (*)</label>
                   <input
                     type="number"
                     step="1000000"
                     value={investorFormData.dealRevenue}
                     onChange={(e) => {
                       const val = e.target.value;
-                      const num = parseFloat(val) || 0;
                       setInvestorFormData({
                         ...investorFormData,
                         dealRevenue: val,
@@ -558,11 +563,26 @@ export function ContractWorkflow({
                       ? `${(parseFloat(investorFormData.dealRevenue) / 1000000000).toFixed(2)} Tỷ VND`
                       : ''}
                   </div>
+                  <div className="text-[10px] text-emerald-400 mt-1">DoanhSo = GiaHopDong, hệ thống tự động ghi nhận.</div>
                 </div>
 
-                {/* 7. Trạng Thái Thanh Toán Hoa Hồng */}
+                {/* 7. DoanhThu thực nhận từ giao dịch */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">7. Trạng Thái Hoa Hồng [TrangThaiHoaHong]</label>
+                  <label className="block text-slate-300 font-bold mb-1">7. Doanh Thu Thực Nhận Từ Giao Dịch [DoanhThu] (VND)</label>
+                  <input
+                    type="number"
+                    step="100000"
+                    value={investorFormData.doanhthu}
+                    onChange={(e) => setInvestorFormData({ ...investorFormData, doanhthu: e.target.value })}
+                    placeholder="Sales Admin nhập tiền thực nhận..."
+                    className="w-full bg-slate-900 border border-slate-700 text-white p-2.5 rounded-xl outline-none focus:border-cyan-500 font-bold text-cyan-300"
+                  />
+                  <div className="text-[10px] text-slate-500 mt-1">Không tự tính theo tỷ lệ dự án.</div>
+                </div>
+
+                {/* 8. Trạng Thái Thanh Toán Hoa Hồng */}
+                <div>
+                  <label className="block text-slate-300 font-bold mb-1">8. Trạng Thái Hoa Hồng [TrangThaiHoaHong]</label>
                   <select
                     value={investorFormData.commissionStatus}
                     onChange={(e) => setInvestorFormData({ ...investorFormData, commissionStatus: e.target.value })}
@@ -573,9 +593,9 @@ export function ContractWorkflow({
                   </select>
                 </div>
 
-                {/* 8. Ngày Dự Kiến Trả Hoa Hồng */}
+                {/* 9. Ngày Dự Kiến Trả Hoa Hồng */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">8. Ngày Dự Kiến Trả Hoa Hồng (dd/mm/yyyy)</label>
+                  <label className="block text-slate-300 font-bold mb-1">9. Ngày Dự Kiến Trả Hoa Hồng (dd/mm/yyyy)</label>
                   <input
                     type="text"
                     placeholder="VD: 25/10/2026"
@@ -585,9 +605,9 @@ export function ContractWorkflow({
                   />
                 </div>
 
-                {/* 9. Số Tiền Hoa Hồng (3%) */}
+                {/* 10. Số Tiền Hoa Hồng */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">9. Tiền Hoa Hồng Sales (VND)</label>
+                  <label className="block text-slate-300 font-bold mb-1">10. Tiền Hoa Hồng NVKD [HoaHong] (VND)</label>
                   <input
                     type="number"
                     step="100000"
@@ -597,9 +617,9 @@ export function ContractWorkflow({
                   />
                 </div>
 
-                {/* 10. Ghi chú CĐT */}
+                {/* 11. Ghi chú CĐT */}
                 <div>
-                  <label className="block text-slate-300 font-bold mb-1">10. Ghi Chú Từ CĐT</label>
+                  <label className="block text-slate-300 font-bold mb-1">11. Ghi Chú Từ CĐT</label>
                   <input
                     type="text"
                     placeholder="Ghi chú đợt thanh toán, ngân hàng..."
