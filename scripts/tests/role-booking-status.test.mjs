@@ -151,6 +151,17 @@ test('response parser returns useful errors for HTML and empty API responses', a
   assert.deepEqual(json, { success: true });
 });
 
+test('Excel export refreshes the report snapshot before writing rows', () => {
+  const source = fs.readFileSync(new URL('../../src/components/ReportsDashboard.tsx', import.meta.url), 'utf8');
+
+  assert.match(source, /const exportData = await fetchReportSnapshot\(\);/);
+  assert.match(source, /exportData\.report1_DoanhThu/);
+  assert.match(source, /exportData\.report2_SanPhamDuAn/);
+  assert.match(source, /exportData\.report3_DoanhSoNV/);
+  assert.match(source, /readJsonResponse/);
+  assert.doesNotMatch(source, /const json = await res\.json\(\);/);
+});
+
 test('bank webhook waits for Sales Admin before finalizing the product', () => {
   const source = fs.readFileSync(new URL('../../src/app/api/v1/payments/webhooks/vietqr/route.ts', import.meta.url), 'utf8');
   assert.match(source, /status: 'REVIEW_REQUIRED'/);

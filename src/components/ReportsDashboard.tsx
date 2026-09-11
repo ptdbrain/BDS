@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import ExcelJS from 'exceljs';
 import { AHSLogo } from '@/components/AHSLogo';
 import { getReportTabsForRole } from '@/lib/rolePolicy';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 import {
   BarChart,
@@ -97,29 +98,48 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
   // Export loading state
   const [isExporting, setIsExporting] = useState<boolean>(false);
 
+  // Fetch one authoritative report snapshot for the selected date range.
+  // Export uses this same path so it cannot write a workbook from stale/empty UI state.
+  const fetchReportSnapshot = useCallback(async (s?: string, e?: string) => {
+    const sDate = s !== undefined ? s : startDate;
+    const eDate = e !== undefined ? e : endDate;
+    const params = new URLSearchParams();
+    if (sDate) params.append('startDate', sDate);
+    if (eDate) params.append('endDate', eDate);
+    // Truyền role và employeeCode để API phân quyền dữ liệu trả về
+    if (currentRole) params.append('role', currentRole);
+    if (currentUser?.employeeCode) params.append('employeeCode', currentUser.employeeCode);
+
+    const res = await fetch(`/api/v1/reports/dashboard?${params.toString()}`);
+    const json = await readJsonResponse<{ data?: any; error?: string }>(res);
+    const data = json.data;
+    if (
+      !res.ok ||
+      json.error ||
+      !data?.report1_DoanhThu ||
+      !data?.report2_SanPhamDuAn ||
+      !data?.report3_DoanhSoNV
+    ) {
+      throw new Error(json.error || `Không thể tải dữ liệu báo cáo (HTTP ${res.status}).`);
+    }
+
+    return data;
+  }, [startDate, endDate, currentRole, currentUser]);
+
   // Fetch report data for given dates
   const fetchFilteredReport = useCallback(async (s?: string, e?: string) => {
     const sDate = s !== undefined ? s : startDate;
     const eDate = e !== undefined ? e : endDate;
     setIsLoadingFilter(true);
     try {
-      const params = new URLSearchParams();
-      if (sDate) params.append('startDate', sDate);
-      if (eDate) params.append('endDate', eDate);
-      // Truyền role và employeeCode để API phân quyền dữ liệu trả về
-      if (currentRole) params.append('role', currentRole);
-      if (currentUser?.employeeCode) params.append('employeeCode', currentUser.employeeCode);
-      const res = await fetch(`/api/v1/reports/dashboard?${params.toString()}`);
-      const json = await res.json();
-      if (json.data) {
-        setCurrentData(json.data);
-      }
+      const data = await fetchReportSnapshot(sDate, eDate);
+      setCurrentData(data);
     } catch (err) {
       console.error('Lỗi khi lọc số liệu báo cáo:', err);
     } finally {
       setIsLoadingFilter(false);
     }
-  }, [startDate, endDate, currentRole, currentUser]);
+  }, [fetchReportSnapshot, startDate, endDate]);
 
   // Automatically trigger report refetch whenever startDate or endDate changes
   useEffect(() => {
@@ -284,6 +304,22 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
   const handleExportExcel = async () => {
     try {
       setIsExporting(true);
+      const exportData = await fetchReportSnapshot();
+      const report1 = exportData.report1_DoanhThu;
+      const report2 = exportData.report2_SanPhamDuAn;
+      const report3 = exportData.report3_DoanhSoNV;
+      const report1Summary = report1.summary || {};
+      const report3Summary = report3.summary || {};
+      const company = report1Summary.companyInfo || {
+        name: 'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS',
+        address: '',
+        phone: '',
+        creator: 'AHS Admin',
+        createdDate: realtimeDate,
+        period: formattedPeriod,
+        sourceLink: ''
+      };
+      setCurrentData(exportData);
       const wb = new ExcelJS.Workbook();
       wb.creator = 'CÔNG TY CỔ PHẦN BẤT ĐỘNG SẢN AHS';
       wb.lastModifiedBy = company.creator || 'AHS Admin';
@@ -823,7 +859,7 @@ export function ReportsDashboard({ reportData, onRefresh, currentRole, currentUs
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Lỗi khi xuất file Excel:', error);
-      alert('Có lỗi xảy ra khi tạo file Excel. Vui lòng thử lại.');
+      alert(error instanceof Error ? error.message : 'Có lỗi xảy ra khi tạo file Excel. Vui lòng thử lại.');
     } finally {
       setIsExporting(false);
     }
