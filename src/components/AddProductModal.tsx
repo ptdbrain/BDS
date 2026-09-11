@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { PlusCircle, Building, CheckCircle, AlertCircle, X, DollarSign, Layers } from 'lucide-react';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface AddProductModalProps {
   projectId: string;
@@ -88,9 +89,9 @@ export function AddProductModal({
         })
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
 
-      if (!res.ok) {
+      if (!res.ok || data.error) {
         setError(data.error || 'Thêm căn hộ vào quỹ hàng thất bại');
         setIsLoading(false);
         return;

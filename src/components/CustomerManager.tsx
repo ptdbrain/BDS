@@ -25,6 +25,7 @@ import {
   MapPin
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface CustomerManagerProps {
   customers: any[];
@@ -119,7 +120,8 @@ export function CustomerManager({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-        if (!res.ok) throw new Error('Cập nhật hồ sơ thất bại');
+        const data = await readJsonResponse<{ error?: string }>(res);
+        if (!res.ok || data.error) throw new Error(data.error || 'Cập nhật hồ sơ thất bại');
         setFormSuccess('Cập nhật thông tin khách hàng thành công!');
       } else {
         const res = await fetch('/api/v1/customers', {
@@ -136,7 +138,7 @@ export function CustomerManager({
             productData: prefilledLock?.product
           })
         });
-        const data = await res.json();
+        const data = await readJsonResponse<{ data?: any; error?: string }>(res);
 
         if (!res.ok) {
           setFormError(data.error || 'Tạo hồ sơ thất bại.');

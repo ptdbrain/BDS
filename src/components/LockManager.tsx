@@ -26,6 +26,7 @@ import {
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
 import { BookingModal } from '@/components/BookingModal';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface LockManagerProps {
   locks: any[];
@@ -121,8 +122,8 @@ export function LockManager({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; message?: string; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Xác nhận cọc thất bại');
         return;
       }
@@ -157,8 +158,8 @@ export function LockManager({
           actorId: currentUser?.id
         })
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Lưu thất bại');
         return;
       }
@@ -190,8 +191,8 @@ export function LockManager({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; product?: any; message?: string; detail?: string; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.detail || data.error || 'Xác nhận chuyển khoản thất bại');
         return;
       }
@@ -245,8 +246,8 @@ export function LockManager({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; message?: string; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Xác nhận thanh toán cọc thất bại');
         return;
       }

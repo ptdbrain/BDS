@@ -17,6 +17,7 @@ import {
   Clock
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -114,11 +115,14 @@ export function BookingModal({
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
+        const errData = await readJsonResponse<{ error?: string }>(res);
         throw new Error(errData.error || 'Đăng ký booking thất bại');
       }
 
-      const resData = await res.json();
+      const resData = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (resData.error || !resData.data) {
+        throw new Error(resData.error || 'Máy chủ không trả về booking mới');
+      }
       const newBooking = resData.data;
 
       // Ensure full project & sales details exist on client object

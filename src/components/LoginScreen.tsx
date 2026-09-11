@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
 import { AHSLogo } from '@/components/AHSLogo';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: any) => void;
@@ -41,8 +42,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         body: JSON.stringify({ ssoCode: account.code })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) {
         throw new Error(data.error || 'Đăng nhập SSO thất bại');
       }
 
@@ -75,8 +76,8 @@ export function LoginScreen({ onLoginSuccess }: LoginScreenProps) {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) {
         throw new Error(data.error || 'Tài khoản hoặc mật khẩu không chính xác');
       }
 

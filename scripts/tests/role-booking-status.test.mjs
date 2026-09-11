@@ -188,6 +188,25 @@ test('reports keep DoanhSo, DoanhThu, and HoaHong in separate columns', () => {
   assert.match(approveSource, /doanhso: calculatedSales/);
 });
 
+test('client API actions use the safe response parser on every response path', () => {
+  const clientFiles = [
+    '../../src/app/page.tsx',
+    '../../src/components/AddProductModal.tsx',
+    '../../src/components/BookingModal.tsx',
+    '../../src/components/CustomerManager.tsx',
+    '../../src/components/ImportModal.tsx',
+    '../../src/components/InventoryMatrix.tsx',
+    '../../src/components/LockManager.tsx',
+    '../../src/components/LoginScreen.tsx'
+  ];
+
+  for (const file of clientFiles) {
+    const source = fs.readFileSync(new URL(file, import.meta.url), 'utf8');
+    assert.match(source, /readJsonResponse/, `${file} must import the safe response parser`);
+    assert.doesNotMatch(source, /await res\.json\(\)/, `${file} must not consume response bodies with res.json()`);
+  }
+});
+
 test('bank webhook waits for Sales Admin before finalizing the product', () => {
   const source = fs.readFileSync(new URL('../../src/app/api/v1/payments/webhooks/vietqr/route.ts', import.meta.url), 'utf8');
   assert.match(source, /status: 'REVIEW_REQUIRED'/);

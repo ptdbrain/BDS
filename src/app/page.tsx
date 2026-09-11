@@ -17,6 +17,7 @@ import { SwitchAccountModal } from '@/components/SwitchAccountModal';
 import { SSO_ACCOUNTS, SSOAccountConfig } from '@/lib/authConfig';
 import { broadcastSync, onSync } from '@/lib/sync';
 import { getNavigationTabsForRole } from '@/lib/rolePolicy';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 export default function Home() {
   // Authentication & Role State
@@ -72,7 +73,8 @@ export default function Home() {
   const fetchProjects = async () => {
     try {
       const res = await fetch('/api/v1/projects');
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải dự án (HTTP ${res.status}).`);
       if (data.data) {
         setProjects(data.data);
         if (data.data.length > 0 && !selectedProjectId) {
@@ -90,7 +92,8 @@ export default function Home() {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/v1/products?projectId=${selectedProjectId}`);
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải quỹ căn (HTTP ${res.status}).`);
       if (data.data) {
         let mergedProducts = [...data.data];
 
@@ -144,7 +147,8 @@ export default function Home() {
   const fetchLocks = async () => {
     try {
       const res = await fetch('/api/v1/locks');
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải lượt lock (HTTP ${res.status}).`);
       if (data.data) setLocks(data.data);
     } catch (err) {
       console.error('Failed to fetch locks', err);
@@ -155,7 +159,8 @@ export default function Home() {
   const fetchBookings = async () => {
     try {
       const res = await fetch('/api/v1/bookings');
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải lượt booking (HTTP ${res.status}).`);
       let serverBookings: any[] = data.data || [];
 
       // Reconcile with localStorage custom bookings for Vercel multi-container persistence
@@ -188,7 +193,8 @@ export default function Home() {
       if (currentUser?.employeeCode) params.set('employeeCode', currentUser.employeeCode);
       if (currentRole === 'SALES' && currentUser?.id) params.set('salesEmployeeId', currentUser.id);
       const res = await fetch('/api/v1/customers?' + params.toString());
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải khách hàng (HTTP ${res.status}).`);
       if (data.data) setCustomers(data.data);
     } catch (err) {
       console.error('Failed to fetch customers', err);
@@ -202,7 +208,8 @@ export default function Home() {
       if (currentRole) params.set('role', currentRole);
       if (currentUser?.employeeCode) params.set('employeeCode', currentUser.employeeCode);
       const res = await fetch('/api/v1/contracts?' + params.toString());
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải hợp đồng (HTTP ${res.status}).`);
       if (data.data) setContracts(data.data);
     } catch (err) {
       console.error('Failed to fetch contracts', err);
@@ -222,7 +229,8 @@ export default function Home() {
       if (role) params.append('role', role);
       if (empCode) params.append('employeeCode', empCode);
       const res = await fetch(`/api/v1/reports/dashboard?${params.toString()}`);
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải báo cáo (HTTP ${res.status}).`);
       if (data.data) setReportData(data.data);
     } catch (err) {
       console.error('Failed to fetch report data', err);
@@ -308,8 +316,8 @@ export default function Home() {
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; detail?: string; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.detail || data.error || 'Khóa giữ căn thất bại');
         return;
       }
@@ -398,10 +406,11 @@ export default function Home() {
     try {
       const res = await fetch('/api/v1/auth/login', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ssoCode: account.code })
-      });
-      const data = await res.json();
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ssoCode: account.code })
+        });
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể chuyển tài khoản (HTTP ${res.status}).`);
       if (data.data?.user) {
         handleLoginSuccess(data.data.user);
       }

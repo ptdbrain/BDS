@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, AlertTriangle, X } from 'lucide-react';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface ImportModalProps {
   projectId: string;
@@ -61,7 +62,8 @@ B-1202,Tower B,12,74.5,Đông Nam,4842500000,Hoàn thiện cao cấp`;
         })
       });
 
-      const data = await res.json();
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Import thất bại (HTTP ${res.status}).`);
       setImportResult(data.data);
       if (data.data?.success > 0) {
         try {

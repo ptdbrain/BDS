@@ -39,6 +39,7 @@ import { ComprehensiveContractModal } from '@/components/ComprehensiveContractMo
 import { BookingModal } from '@/components/BookingModal';
 import { broadcastSync, onSync } from '@/lib/sync';
 import { getCanonicalProductLabel } from '@/lib/productStatus';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface InventoryMatrixProps {
   products: any[];
@@ -116,11 +117,9 @@ export function InventoryMatrix({
     try {
       const url = selectedProjectId ? `/api/v1/bookings?projectId=${selectedProjectId}` : '/api/v1/bookings';
       const res = await fetch(url);
-      let serverBookings: any[] = [];
-      if (res.ok) {
-        const data = await res.json();
-        serverBookings = data.data || [];
-      }
+      const data = await readJsonResponse<{ data?: any[]; error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || `Không thể tải booking (HTTP ${res.status}).`);
+      let serverBookings: any[] = data.data || [];
 
       // Reconcile with localStorage custom bookings for Vercel multi-container persistence
       try {
@@ -189,7 +188,7 @@ export function InventoryMatrix({
       });
 
       if (!res.ok) {
-        const d = await res.json();
+        const d = await readJsonResponse<{ error?: string }>(res);
         throw new Error(d.error || 'Cập nhật thông tin booking thất bại');
       }
 
@@ -222,8 +221,8 @@ export function InventoryMatrix({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Duyệt thanh toán cọc thất bại');
         return;
       }
@@ -274,8 +273,8 @@ export function InventoryMatrix({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Khớp căn thất bại');
         return;
       }
@@ -342,8 +341,8 @@ export function InventoryMatrix({
           actorName: currentUser?.fullName || 'Quản lý Sản phẩm'
         })
       });
-      const data = await res.json();
-      if (!res.ok) {
+      const data = await readJsonResponse<{ data?: any; message?: string; error?: string }>(res);
+      if (!res.ok || data.error) {
         alert(data.error || 'Cập nhật lịch ra hàng thất bại');
         return;
       }
