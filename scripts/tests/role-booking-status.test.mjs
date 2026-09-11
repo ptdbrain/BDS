@@ -17,6 +17,7 @@ import {
 } from '../../src/lib/rolePolicy.ts';
 import { getCanonicalProductLabel } from '../../src/lib/productStatus.ts';
 import { calculateNextBookingWindow } from '../../src/lib/bookingQueue.ts';
+import { readJsonResponse } from '../../src/lib/readJsonResponse.ts';
 
 test('only Manager views company revenue and only Sales Admin edits financial fields', () => {
   assert.equal(canViewCompanyRevenue('MANAGER'), true);
@@ -129,6 +130,25 @@ test('PDF export is not exposed by contract workbenches', () => {
     fs.readFileSync(new URL('../../src/components/ComprehensiveContractModal.tsx', import.meta.url), 'utf8')
   ].join('\n');
   assert.doesNotMatch(sources, /jspdf|Xuất PDF|handleExportPDF|handleExportContractPDF/i);
+});
+
+test('contract workbenches parse non-JSON responses without throwing', () => {
+  const workflowSource = fs.readFileSync(new URL('../../src/components/ContractWorkflow.tsx', import.meta.url), 'utf8');
+  const modalSource = fs.readFileSync(new URL('../../src/components/ComprehensiveContractModal.tsx', import.meta.url), 'utf8');
+
+  assert.match(workflowSource, /readJsonResponse/);
+  assert.doesNotMatch(workflowSource, /const data = await res\.json\(\);/);
+  assert.match(modalSource, /readJsonResponse/);
+});
+
+test('response parser returns useful errors for HTML and empty API responses', async () => {
+  const html = await readJsonResponse(new Response('<!doctype html>', { status: 502 }));
+  const empty = await readJsonResponse(new Response('', { status: 502 }));
+  const json = await readJsonResponse(new Response(JSON.stringify({ success: true }), { status: 200 }));
+
+  assert.equal(html.error, 'Máy chủ trả về phản hồi không hợp lệ (HTTP 502).');
+  assert.equal(empty.error, 'Máy chủ trả về phản hồi rỗng (HTTP 502).');
+  assert.deepEqual(json, { success: true });
 });
 
 test('bank webhook waits for Sales Admin before finalizing the product', () => {

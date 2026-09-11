@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
 import { ComprehensiveContractModal } from '@/components/ComprehensiveContractModal';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface ContractWorkflowProps {
   contracts: any[];
@@ -150,8 +151,8 @@ export function ContractWorkflow({
             actorName: 'Phạm Thị Mai'
           })
         });
-        if (!res.ok) {
-          const data = await res.json();
+        const data = await readJsonResponse<{ error?: string }>(res);
+        if (!res.ok || data.error) {
           throw new Error(data.error || 'Cập nhật thất bại');
         }
       } else {
@@ -176,8 +177,8 @@ export function ContractWorkflow({
             actorName: 'Phạm Thị Mai'
           })
         });
-        if (!res.ok) {
-          const data = await res.json();
+        const data = await readJsonResponse<{ error?: string }>(res);
+        if (!res.ok || data.error) {
           throw new Error(data.error || 'Tạo hợp đồng thất bại');
         }
       }

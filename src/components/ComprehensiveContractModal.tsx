@@ -16,6 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import { broadcastSync } from '@/lib/sync';
+import { readJsonResponse } from '@/lib/readJsonResponse';
 
 interface ComprehensiveContractModalProps {
   isOpen: boolean;
@@ -165,7 +166,7 @@ export function ComprehensiveContractModal({
       });
 
       if (!res.ok) {
-        const err = await res.json();
+        const err = await readJsonResponse<{ error?: string }>(res);
         throw new Error(err.error || 'Lỗi khi lưu hợp đồng');
       }
 
@@ -206,8 +207,8 @@ export function ComprehensiveContractModal({
           productId: activeProduct?.id
         })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Duyệt hợp đồng thất bại');
+      const data = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || 'Duyệt hợp đồng thất bại');
 
       // Cập nhật ngay ahs_custom_products trong localStorage để đồng bộ ngay lập tức sang ĐÃ BÁN
       if (typeof window !== 'undefined') {
@@ -270,8 +271,8 @@ export function ComprehensiveContractModal({
           productId: activeProduct?.id
         })
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Yêu cầu chỉnh sửa thất bại');
+      const data = await readJsonResponse<{ error?: string }>(res);
+      if (!res.ok || data.error) throw new Error(data.error || 'Yêu cầu chỉnh sửa thất bại');
 
       setSuccessMessage('Đã gửi yêu cầu nhập lại thông tin cho Nhân viên kinh doanh.');
       setIsRejectPromptOpen(false);
