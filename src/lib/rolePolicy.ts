@@ -1,6 +1,10 @@
 const normalizeRole = (role: string | null | undefined) => String(role || '').trim().toUpperCase();
 const normalizeStatus = (status: string | null | undefined) => String(status || '').trim().toUpperCase();
 
+export function isManagerReadOnly(role: string): boolean {
+  return normalizeRole(role) === 'MANAGER';
+}
+
 export function canViewCompanyRevenue(role: string): boolean {
   return normalizeRole(role) === 'MANAGER';
 }
@@ -29,16 +33,20 @@ export function canSalesConfirmPayment(
 }
 
 export function canConfirmLockTransfer(role: string, lockStatus: string | null | undefined): boolean {
-  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role))
+  return normalizeRole(role) === 'SALES_ADMIN'
     && normalizeStatus(lockStatus) === 'PAYMENT_PENDING';
 }
 
 export function canRequestContractChanges(role: string): boolean {
-  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role));
+  return normalizeRole(role) === 'SALES_ADMIN';
 }
 
 export function canApproveBooking(role: string): boolean {
-  return ['SALES_ADMIN', 'MANAGER'].includes(normalizeRole(role));
+  return normalizeRole(role) === 'SALES_ADMIN';
+}
+
+export function canReviewContract(role: string): boolean {
+  return normalizeRole(role) === 'SALES_ADMIN';
 }
 
 export function canOpenCustomerHandoff(role: string, paymentStatus: string | null | undefined): boolean {

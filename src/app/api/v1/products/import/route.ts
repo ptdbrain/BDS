@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'PRODUCT_ADMIN').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được import quỹ hàng.' }, { status: 403 });
+    }
     const { projectId, items, actorId = 'emp_prod_01', actorName = 'Nguyễn Tiến Dũng' } = body;
 
     if (!projectId || !items || !Array.isArray(items)) {

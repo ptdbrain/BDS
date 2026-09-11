@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -8,6 +9,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES_ADMIN').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được ký hợp đồng.' }, { status: 403 });
+    }
     const { actorId = 'emp_admin_01', actorName = 'Phạm Thị Mai' } = body;
 
     const contract = await db.contract.findUnique({

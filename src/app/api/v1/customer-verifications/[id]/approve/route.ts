@@ -12,7 +12,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
     if (!canRequestContractChanges(actorRole)) {
-      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được duyệt thông tin khách hàng.' }, { status: 403 });
+      return NextResponse.json({ error: 'Chỉ Sales Admin được duyệt thông tin khách hàng.' }, { status: 403 });
     }
     const { reviewerId = 'NV007', reviewerName = 'Vũ Mai Phương (Sales Admin)', notes = 'Thông tin CCCD và hợp đồng hợp lệ' } = body;
 

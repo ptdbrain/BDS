@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function GET(request: Request) {
   try {
@@ -33,6 +34,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được tạo booking.' }, { status: 403 });
+    }
     const {
       projectId,
       salesEmployeeId = 'emp_sales_01',

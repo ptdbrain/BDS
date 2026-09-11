@@ -139,43 +139,43 @@ export function Sidebar({
     }
   ];
 
-  // 4. Executive Management (Ban Lãnh Đạo / Giám đốc): full access
+  // 4. Executive Management (Ban Lãnh Đạo / Giám đốc): read-only operations + reports
   const managerNavItems: NavItem[] = [
     {
       id: 'inventory' as TabType,
-      label: 'Bảng Hàng & Quỹ Hàng',
-      desc: 'Quản lý căn & bảng matrix',
+      label: 'Bảng Hàng & Quỹ Hàng (Chỉ Xem)',
+      desc: 'Xem căn, giá và trạng thái',
       icon: Grid,
       badge: null
     },
     {
       id: 'locks' as TabType,
-      label: 'Khóa Căn & Giao Dịch',
-      desc: 'Giữ căn 30m & trạng thái giao dịch',
+      label: 'Giao Dịch (Chỉ Xem)',
+      desc: 'Xem lock, booking và trạng thái',
       icon: Clock,
       badge: activeLocksCount > 0 ? activeLocksCount : null,
       badgeColor: 'bg-amber-500'
     },
     {
       id: 'customers' as TabType,
-      label: 'Khách Hàng & Hồ Sơ',
-      desc: 'Xác minh PII khách hàng',
+      label: 'Khách Hàng (Chỉ Xem)',
+      desc: 'Xem khách hàng và hồ sơ',
       icon: UserCheck,
       badge: pendingVerificationsCount > 0 ? pendingVerificationsCount : null,
       badgeColor: 'bg-brand-500'
     },
     {
       id: 'contracts' as TabType,
-      label: 'Hợp Đồng & Phê Duyệt',
-      desc: 'Quy trình duyệt bán',
+      label: 'Hợp Đồng (Chỉ Xem)',
+      desc: 'Xem hợp đồng và trạng thái',
       icon: FileText,
       badge: pendingContractsCount > 0 ? pendingContractsCount : null,
       badgeColor: 'bg-purple-500'
     },
     {
       id: 'reports' as TabType,
-      label: 'Báo Cáo',
-      desc: 'Doanh thu, doanh số & KPI toàn công ty',
+      label: 'Báo Cáo & Lập Báo Cáo',
+      desc: 'Doanh thu, doanh số và KPI',
       icon: TrendingUp,
       badge: null
     }

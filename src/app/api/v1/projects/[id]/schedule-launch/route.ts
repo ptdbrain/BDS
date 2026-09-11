@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -9,6 +10,10 @@ export async function POST(
   try {
     const projectId = params.id;
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'PRODUCT_ADMIN').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được thiết lập lịch ra hàng.' }, { status: 403 });
+    }
     const {
       saleOpenAt,
       resetAllBookings = true,

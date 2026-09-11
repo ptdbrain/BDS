@@ -13,7 +13,7 @@ export async function POST(
     const body = await request.json().catch(() => ({}));
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
     if (!canRequestContractChanges(actorRole)) {
-      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được yêu cầu sửa hợp đồng.' }, { status: 403 });
+      return NextResponse.json({ error: 'Chỉ Sales Admin được yêu cầu sửa hợp đồng.' }, { status: 403 });
     }
     const {
       reviewerId = 'NV007',

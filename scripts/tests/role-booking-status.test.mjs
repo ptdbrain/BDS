@@ -71,21 +71,50 @@ test('lock payment confirmations follow the Sales then Sales Admin sequence', ()
   assert.equal(canSalesConfirmPayment('SALES', 'sales-2', 'sales-1'), false);
   assert.equal(canConfirmLockTransfer('SALES_ADMIN', 'PAYMENT_PENDING'), true);
   assert.equal(canConfirmLockTransfer('SALES_ADMIN', 'ACTIVE'), false);
-  assert.equal(canConfirmLockTransfer('MANAGER', 'PAYMENT_PENDING'), true);
+  assert.equal(canConfirmLockTransfer('MANAGER', 'PAYMENT_PENDING'), false);
 });
 
-test('only reviewers can request contract changes', () => {
+test('only Sales Admin can review customer and contract changes', () => {
   assert.equal(canRequestContractChanges('SALES_ADMIN'), true);
-  assert.equal(canRequestContractChanges('MANAGER'), true);
+  assert.equal(canRequestContractChanges('MANAGER'), false);
   assert.equal(canRequestContractChanges('SALES'), false);
   assert.equal(canRequestContractChanges('PRODUCT_ADMIN'), false);
 });
 
-test('only Sales Admin or Manager can approve a booking payment', () => {
+test('only Sales Admin can approve a booking payment', () => {
   assert.equal(canApproveBooking('SALES_ADMIN'), true);
-  assert.equal(canApproveBooking('MANAGER'), true);
+  assert.equal(canApproveBooking('MANAGER'), false);
   assert.equal(canApproveBooking('SALES'), false);
   assert.equal(canApproveBooking('PRODUCT_ADMIN'), false);
+});
+
+test('Manager stays visible in operational modules but all write controls are read-only', () => {
+  assert.deepEqual(getNavigationTabsForRole('MANAGER'), ['inventory', 'locks', 'customers', 'contracts', 'reports']);
+  assert.equal(canConfirmLockTransfer('MANAGER', 'PAYMENT_PENDING'), false);
+  assert.equal(canRequestContractChanges('MANAGER'), false);
+  assert.equal(canApproveBooking('MANAGER'), false);
+
+  const inventorySource = fs.readFileSync(new URL('../../src/components/InventoryMatrix.tsx', import.meta.url), 'utf8');
+  const lockSource = fs.readFileSync(new URL('../../src/components/LockManager.tsx', import.meta.url), 'utf8');
+  const customerSource = fs.readFileSync(new URL('../../src/components/CustomerManager.tsx', import.meta.url), 'utf8');
+  const contractSource = fs.readFileSync(new URL('../../src/components/ComprehensiveContractModal.tsx', import.meta.url), 'utf8');
+
+  assert.doesNotMatch(inventorySource, /currentRole === 'MANAGER'/, 'inventory must not expose Manager write paths');
+  assert.match(lockSource, /currentRole === 'PRODUCT_ADMIN' \|\| currentRole === 'MANAGER'/, 'transactions must render a Manager read-only state');
+  assert.doesNotMatch(lockSource, /currentRole === 'SALES_ADMIN' \|\| currentRole === 'MANAGER'/, 'transactions must not expose Manager approval paths');
+  assert.match(customerSource, /const canReviewCustomers = currentRole === 'SALES_ADMIN'/);
+  assert.match(contractSource, /const canReviewContract = isSalesAdmin;/);
+  assert.match(contractSource, /isSales && !isApproved/);
+  assert.doesNotMatch(contractSource, /!isSalesAdmin && !isApproved/);
+});
+
+test('selling projects are not blocked by the future launch schedule', () => {
+  const seedSource = fs.readFileSync(new URL('../../scripts/import_excel_practice_data.mjs', import.meta.url), 'utf8');
+  assert.match(
+    seedSource,
+    /saleOpenAt:\s*isSelling\s*\?\s*null\s*:\s*new Date\(2026,\s*8,\s*11,\s*14,\s*0,\s*0\)/,
+    'open-for-sale projects must not inherit the future launch time'
+  );
 });
 
 test('booking information updates enforce the assigned Sales owner', () => {

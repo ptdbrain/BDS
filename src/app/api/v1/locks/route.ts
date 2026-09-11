@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { acquireProductLock, sweepExpiredLocks } from '@/lib/locks';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function GET() {
   try {
@@ -28,6 +29,10 @@ export async function POST(request: Request) {
   try {
     const idempotencyKey = request.headers.get('Idempotency-Key') || undefined;
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được tạo lock.' }, { status: 403 });
+    }
     const {
       productId,
       salesEmployeeId = 'emp_sales_01',

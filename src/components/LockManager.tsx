@@ -317,13 +317,13 @@ export function LockManager({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-lg font-black text-white">
-                  {currentRole === 'PRODUCT_ADMIN'
+                  {currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER'
                     ? 'Danh Mục Giao Dịch (Khóa Căn & Thanh Toán) - Chỉ Xem'
                     : currentRole === 'SALES_ADMIN'
                     ? 'Danh Mục Giao Dịch - Duyệt Cọc Booking & Xác Nhận Chuyển Khoản'
                     : 'Quản Lý Booking, Khóa Căn & Thanh Toán Cọc'}
                 </h2>
-                {currentRole === 'PRODUCT_ADMIN' && (
+                {(currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER') && (
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-amber-400 border border-amber-500/30">
                     CHỈ XEM (READ-ONLY)
                   </span>
@@ -335,7 +335,7 @@ export function LockManager({
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                {currentRole === 'PRODUCT_ADMIN'
+                {currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER'
                   ? 'Theo dõi lượt booking, thời gian khóa giữ căn và tình trạng thanh toán (chế độ chỉ xem).'
                   : currentRole === 'SALES_ADMIN'
                   ? 'Xác nhận cọc Booking (50M) để kích hoạt 10 phút khớp căn cho Sales, hoặc duyệt cọc căn 30 phút.'
@@ -447,7 +447,7 @@ export function LockManager({
                 </div>
 
                 <div className="pt-2 border-t border-slate-800">
-                  {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt ? (
+                  {currentRole === 'SALES_ADMIN' && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt ? (
                     <button
                       onClick={() => handleApproveBooking(b.id)}
                       disabled={isApprovingBooking === b.id}
@@ -592,15 +592,15 @@ export function LockManager({
                   </div>
 
                   {/* Action Buttons per Role */}
-                  {currentRole === 'PRODUCT_ADMIN' ? (
-                    // PRODUCT ADMIN: READ-ONLY (No action buttons)
+                  {currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER' ? (
+                    // PRODUCT ADMIN / MANAGER: READ-ONLY (No action buttons)
                     <div className="pt-2">
                       <div className="py-2 px-3 rounded-xl bg-slate-900/80 border border-slate-800 text-center text-slate-400 text-[11px] font-semibold flex items-center justify-center space-x-1.5">
                         <Eye className="w-3.5 h-3.5 text-brand-400" />
                         <span>Chế độ chỉ xem (Không có quyền xác nhận cọc)</span>
                       </div>
                     </div>
-                  ) : currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? (
+                  ) : currentRole === 'SALES_ADMIN' ? (
                     // SALES ADMIN: Confirm Transfer Button (Converts to SOLD)
                     <div className="space-y-2 pt-2">
                       {lock.status === 'PAYMENT_PENDING' && <button
@@ -872,7 +872,7 @@ export function LockManager({
                             </button>
                           )}
 
-                          {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt && (
+                          {currentRole === 'SALES_ADMIN' && b.trangthaikhopcan === 'CHO_DUYET_COC' && !b.depositConfirmedAt && (
                             <button
                               onClick={() => handleApproveBooking(b.id)}
                               disabled={isApprovingBooking === b.id}

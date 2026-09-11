@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function GET(
   request: Request,
@@ -34,6 +35,10 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'PRODUCT_ADMIN').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được sửa dự án.' }, { status: 403 });
+    }
     const { imagesJson, name, location, status, lockDurationMinutes, actorId = 'emp_prod_01', actorName = 'Nguyễn Tiến Dũng' } = body;
 
     const dataToUpdate: any = {};

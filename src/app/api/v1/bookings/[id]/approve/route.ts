@@ -19,7 +19,7 @@ export async function PATCH(
     } = body;
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
     if (!canApproveBooking(actorRole)) {
-      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được xác nhận giao dịch Booking.' }, { status: 403 });
+      return NextResponse.json({ error: 'Chỉ Sales Admin được xác nhận giao dịch Booking.' }, { status: 403 });
     }
 
     let booking = await db.booking.findUnique({

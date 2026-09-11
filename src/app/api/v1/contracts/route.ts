@@ -5,7 +5,7 @@ import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { ensureProductExists } from '@/lib/productHelper';
 import { getAuthorizedFinancialFields, sanitizeContractForRole } from '@/lib/contractFinancialPolicy';
-import { isSubmittedContractStatus } from '@/lib/rolePolicy';
+import { isManagerReadOnly, isSubmittedContractStatus } from '@/lib/rolePolicy';
 
 export async function GET(request: Request) {
   try {
@@ -57,6 +57,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được tạo hợp đồng.' }, { status: 403 });
+    }
     let financialFields: Record<string, unknown>;
     try {
       financialFields = getAuthorizedFinancialFields(actorRole, body);

@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit';
 import { ensureContractExists } from '@/lib/contractHelper';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { getAuthorizedFinancialFields } from '@/lib/contractFinancialPolicy';
+import { canReviewContract } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -12,8 +13,8 @@ export async function POST(
   try {
     const body = await request.json().catch(() => ({}));
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || '').toUpperCase();
-    if (actorRole !== 'SALES_ADMIN' && actorRole !== 'MANAGER') {
-      return NextResponse.json({ error: 'Chỉ Sales Admin hoặc Manager được duyệt hợp đồng.' }, { status: 403 });
+    if (!canReviewContract(actorRole)) {
+      return NextResponse.json({ error: 'Chỉ Sales Admin được duyệt hợp đồng.' }, { status: 403 });
     }
     const {
       reviewerId = 'NV007',

@@ -303,7 +303,7 @@ async function main() {
         location: row.DiaDiem,
         investorId: inv.id,
         status: isSelling ? 'SELLING' : 'UPCOMING',
-        saleOpenAt: new Date(2026, 8, 11, 14, 0, 0), // 14h00 chiều ngày 11/09/2026
+        saleOpenAt: isSelling ? null : new Date(2026, 8, 11, 14, 0, 0), // Chỉ dự án sắp mở bán chờ 14h00 ngày 11/09/2026
         lockDurationMinutes: 30,
         imagesJson: getProjectSlides(row.MaDA),
         // Class diagram fields

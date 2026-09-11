@@ -291,7 +291,7 @@ export function ComprehensiveContractModal({
 
   const isManager = currentRole === 'MANAGER';
   const isSalesAdmin = currentRole === 'SALES_ADMIN';
-  const canReviewContract = isSalesAdmin || isManager;
+  const canReviewContract = isSalesAdmin;
   const isSales = currentRole === 'SALES';
   const isProductAdmin = currentRole === 'PRODUCT_ADMIN';
 
@@ -438,6 +438,7 @@ export function ComprehensiveContractModal({
 
           {/* 2. LỚP HỢP ĐỒNG [HopDong] & KHÁCH HÀNG */}
           <form id="contract-form" onSubmit={handleSalesSubmit} className="space-y-4">
+            <fieldset disabled={isManager} className="space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-2">
               <h4 className="font-extrabold text-purple-400 uppercase tracking-wider flex items-center space-x-2">
                 <User className="w-4 h-4" />
@@ -681,6 +682,7 @@ export function ComprehensiveContractModal({
                 />
               </div>
             </div>
+            </fieldset>
           </form>
         </div>
 
@@ -696,7 +698,7 @@ export function ComprehensiveContractModal({
             </button>
 
             {/* Sales submit button */}
-            {!isSalesAdmin && !isApproved && (
+            {isSales && !isApproved && (
               <button
                 type="submit"
                 form="contract-form"

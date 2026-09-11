@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function POST(
   request: Request,
@@ -8,6 +9,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json().catch(() => ({}));
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được hủy lock.' }, { status: 403 });
+    }
     const { reason = 'Hủy giữ căn theo yêu cầu Sales', actorId = 'emp_sales_01', actorName = 'Trần Văn Nam' } = body;
 
     const lock = await db.productLock.findUnique({

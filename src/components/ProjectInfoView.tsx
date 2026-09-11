@@ -133,6 +133,7 @@ export function ProjectInfoView({ project, currentRole = 'SALES', onRefresh }: P
 
   // Save slides to server
   const saveSlidesToServer = async (updatedSlides: SlideItem[]) => {
+    if (currentRole !== 'PRODUCT_ADMIN') return;
     setIsSaving(true);
     try {
       const res = await fetch(`/api/v1/projects/${project.id}`, {
@@ -191,7 +192,7 @@ export function ProjectInfoView({ project, currentRole = 'SALES', onRefresh }: P
   };
 
   const currentSlide = slides[currentSlideIndex] || slides[0] || DEFAULT_SLIDES[0];
-  const canManageSlides = currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER';
+  const canManageSlides = currentRole === 'PRODUCT_ADMIN';
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">

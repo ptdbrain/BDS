@@ -4,7 +4,7 @@ import { createAuditLog } from '@/lib/audit';
 import { ensureDatabaseSeeded } from '@/lib/seedHelper';
 import { encryptPII, decryptPII, hashPII } from '@/lib/security';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
-import { isSubmittedCustomerStatus } from '@/lib/rolePolicy';
+import { isManagerReadOnly, isSubmittedCustomerStatus } from '@/lib/rolePolicy';
 
 function maskCCCD(cccd: string) {
   if (!cccd || cccd.length < 4) return '********';
@@ -156,6 +156,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được tạo hồ sơ khách hàng.' }, { status: 403 });
+    }
     const {
       fullName,
       gender = 'Nam',

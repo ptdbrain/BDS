@@ -47,7 +47,7 @@ export function CustomerManager({
 }: CustomerManagerProps) {
   const [revealPII, setRevealPII] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isFormOpen, setIsFormOpen] = useState<boolean>(!!autoOpenForm || !!prefilledLock);
+  const [isFormOpen, setIsFormOpen] = useState<boolean>(currentRole === 'SALES' && (!!autoOpenForm || !!prefilledLock));
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [selectedVerification, setSelectedVerification] = useState<any | null>(null);
 
@@ -69,7 +69,13 @@ export function CustomerManager({
 
   // Auto open form and prefill data when redirected from Lock / Deposit payment
   React.useEffect(() => {
-    if (autoOpenForm || prefilledLock) {
+    if (currentRole === 'MANAGER') {
+      setIsFormOpen(false);
+      setSelectedVerification(null);
+      setEditingCustomerId(null);
+      return;
+    }
+    if (currentRole === 'SALES' && (autoOpenForm || prefilledLock)) {
       setIsFormOpen(true);
       if (prefilledLock) {
         setFormData((prev) => ({
@@ -79,7 +85,7 @@ export function CustomerManager({
         }));
       }
     }
-  }, [autoOpenForm, prefilledLock]);
+  }, [autoOpenForm, prefilledLock, currentRole]);
 
   // Change request state
   const [changeReason, setChangeReason] = useState<string>('');
@@ -97,6 +103,7 @@ export function CustomerManager({
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentRole !== 'SALES') return;
     setFormError('');
     setFormSuccess('');
 
@@ -167,6 +174,7 @@ export function CustomerManager({
   };
 
   const handleDeleteCustomer = async (customerId: string) => {
+    if (currentRole !== 'SALES') return;
     if (!confirm('Bạn có chắc chắn muốn xóa thông tin khách hàng này?')) return;
     try {
       const res = await fetch(`/api/v1/customers/${customerId}`, { method: 'DELETE' });
@@ -177,6 +185,7 @@ export function CustomerManager({
   };
 
   const startEditCustomer = (cust: any) => {
+    if (currentRole !== 'SALES') return;
     setEditingCustomerId(cust.id);
     setFormData({
       fullName: cust.fullName || '',
@@ -194,6 +203,7 @@ export function CustomerManager({
 
   // Sales Admin actions
   const handleApproveVerification = async (verId: string) => {
+    if (currentRole !== 'SALES_ADMIN') return;
     try {
       const res = await fetch(`/api/v1/customer-verifications/${verId}/approve`, {
         method: 'POST',
@@ -223,6 +233,7 @@ export function CustomerManager({
   };
 
   const handleRequestChanges = async (verId: string) => {
+    if (currentRole !== 'SALES_ADMIN') return;
     if (!changeReason.trim()) {
       alert('Vui lòng nhập lý do hoặc thông tin sai sót cần yêu cầu nhập liệu lại!');
       return;
@@ -300,7 +311,8 @@ export function CustomerManager({
     document.body.removeChild(link);
   };
 
-  const isSalesAdmin = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER';
+  const canReviewCustomers = currentRole === 'SALES_ADMIN';
+  const canExportCustomerData = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER';
 
   return (
     <div className="space-y-6">
@@ -314,19 +326,23 @@ export function CustomerManager({
             <div>
               <div className="flex items-center space-x-2">
                 <h2 className="text-lg font-black text-white">
-                  {isSalesAdmin
+                  {canReviewCustomers
                     ? 'Danh Mục Thông Tin Khách Hàng (Sales Admin Workbench)'
+                    : currentRole === 'MANAGER'
+                    ? 'Danh Sách Khách Hàng Toàn Hệ Thống (Chỉ Xem)'
                     : 'Thông Tin Khách Hàng Cá Nhân'}
                 </h2>
-                {isSalesAdmin && (
+                {canReviewCustomers && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                     TOÀN HỆ THỐNG
                   </span>
                 )}
               </div>
               <p className="text-xs text-slate-400">
-                {isSalesAdmin
+                {canReviewCustomers
                   ? 'Quản lý toàn bộ khách hàng giao dịch, đối soát căn cọc đính kèm, duyệt PII và xuất báo cáo gửi CĐT.'
+                  : currentRole === 'MANAGER'
+                  ? 'Xem toàn bộ khách hàng giao dịch và thông tin căn đính kèm ở chế độ chỉ đọc.'
                   : 'Khai báo và quản lý hồ sơ khách hàng giao dịch của nhân viên kinh doanh.'}
               </p>
             </div>
@@ -348,7 +364,7 @@ export function CustomerManager({
           </button>
 
           {/* Export to Investor Button (for Sales Admin / Manager) */}
-          {isSalesAdmin && (
+          {canExportCustomerData && (
             <button
               onClick={() => setIsExportModalOpen(true)}
               className="flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold shadow-lg shadow-emerald-600/20 hover:brightness-110 transition"
@@ -372,7 +388,7 @@ export function CustomerManager({
       </div>
 
       {/* NEW CUSTOMER INTAKE FORM (FOR SALES) */}
-      {isFormOpen && (
+      {isFormOpen && currentRole === 'SALES' && (
         <div className="glass-panel p-6 rounded-2xl border border-brand-500/30 space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between border-b border-slate-800 pb-3">
             <h3 className="text-sm font-extrabold text-white flex items-center space-x-2">
@@ -551,13 +567,13 @@ export function CustomerManager({
             <h3 className="text-sm font-extrabold text-white flex items-center space-x-2">
               <UserCheck className="w-4 h-4 text-brand-400" />
               <span>
-                {isSalesAdmin
+                {canReviewCustomers || currentRole === 'MANAGER'
                   ? `Toàn Bộ Khách Hàng Đã Giao Dịch (${filteredCustomers.length})`
                   : `Danh Sách Khách Hàng Của Tôi (${filteredCustomers.length})`}
               </span>
             </h3>
             <p className="text-[11px] text-slate-400">
-              {isSalesAdmin
+              {canReviewCustomers || currentRole === 'MANAGER'
                 ? 'Bao gồm thông tin đính kèm của căn khách hàng đã cọc do Sales nhập liệu'
                 : 'Khách hàng cá nhân do bạn trực tiếp quản lý và chăm sóc'}
             </p>
@@ -681,7 +697,7 @@ export function CustomerManager({
                       {/* Actions */}
                       <td className="p-3.5 text-right space-y-1.5">
                         {/* SALES ADMIN ACTIONS */}
-                        {isSalesAdmin && (
+                        {canReviewCustomers && (
                           <div className="flex items-center justify-end space-x-1.5">
                             {!isVerified ? (
                               <>
@@ -749,7 +765,7 @@ export function CustomerManager({
       </div>
 
       {/* SALES ADMIN VERIFICATION / REQUEST CHANGES MODAL */}
-      {selectedVerification && (
+      {selectedVerification && canReviewCustomers && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in">
           <div className="glass-panel w-full max-w-md rounded-2xl border border-slate-700 shadow-2xl p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">

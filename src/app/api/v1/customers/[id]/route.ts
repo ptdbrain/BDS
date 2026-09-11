@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { createAuditLog } from '@/lib/audit';
 import { encryptPII, hashPII } from '@/lib/security';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function PUT(
   request: Request,
@@ -11,6 +12,10 @@ export async function PUT(
   try {
     const { id } = params;
     const body = await request.json();
+    const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được sửa hồ sơ khách hàng.' }, { status: 403 });
+    }
     const {
       fullName,
       gender,
@@ -93,6 +98,10 @@ export async function DELETE(
   try {
     const { id } = params;
     const { searchParams } = new URL(request.url);
+    const actorRole = (searchParams.get('role') || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được xóa hồ sơ khách hàng.' }, { status: 403 });
+    }
     const actorId = searchParams.get('actorId') || 'emp_sales_01';
     const actorName = searchParams.get('actorName') || 'Trần Văn Nam';
 

@@ -301,12 +301,16 @@ export function InventoryMatrix({
   const [isSchedulingLaunch, setIsSchedulingLaunch] = useState(false);
   const [customLaunchInput, setCustomLaunchInput] = useState('');
 
-  // Project launch time (Default: 14:00 11/09/2026 as per user specification)
+  // Only projects with an explicit future saleOpenAt are waiting for launch.
+  // Selling projects from the source data intentionally have saleOpenAt = null.
   const projectLaunchTime = selectedProject?.saleOpenAt
     ? new Date(selectedProject.saleOpenAt)
-    : new Date(2026, 8, 11, 14, 0, 0);
+    : null;
 
-  const isWaitingForLaunch = nowTime < projectLaunchTime.getTime();
+  const isWaitingForLaunch = Boolean(projectLaunchTime && nowTime < projectLaunchTime.getTime());
+  const launchLabel = projectLaunchTime
+    ? `${projectLaunchTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - ${projectLaunchTime.toLocaleDateString('vi-VN')}`
+    : 'Đã mở bán theo trạng thái dự án';
 
   const getLaunchCountdown = (target: Date) => {
     const diff = target.getTime() - nowTime;
@@ -556,7 +560,7 @@ export function InventoryMatrix({
             )}
 
             {/* Product Admin Add Unit & Bulk Import buttons */}
-            {(currentRole === 'PRODUCT_ADMIN' || currentRole === 'MANAGER') && (
+            {currentRole === 'PRODUCT_ADMIN' && (
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsAddProductModalOpen(true)}
@@ -690,7 +694,7 @@ export function InventoryMatrix({
                   </span>
                   {isWaitingForLaunch ? (
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
-                      ⏳ Đang Chờ Ra Hàng ({getLaunchCountdown(projectLaunchTime)})
+                      ⏳ Đang Chờ Ra Hàng ({getLaunchCountdown(projectLaunchTime!)})
                     </span>
                   ) : (
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1">
@@ -700,15 +704,15 @@ export function InventoryMatrix({
                   )}
                 </div>
                 <h4 className="text-base font-black text-white">
-                  Thời điểm ra hàng: <span className="text-amber-300 font-mono">{projectLaunchTime.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {projectLaunchTime.toLocaleDateString('vi-VN')}</span>
+                  Thời điểm ra hàng: <span className="text-amber-300 font-mono">{launchLabel}</span>
                 </h4>
                 <p className="text-xs text-slate-300 leading-relaxed">
                   <strong>Quy định nghiệp vụ:</strong> Không phải cứ booking xong là được khớp căn ngay, mà tất cả các lượt booking đều phải chờ đến thời điểm ra hàng. Đúng giờ ra hàng, Lượt Booking #001 được 10 phút khớp căn đầu tiên, tiếp theo đến Lượt #002 (+10 phút), Lượt #003 (+20 phút),... tuần tự cho tới hết.
                 </p>
               </div>
 
-              {/* Action Buttons for Testing & Resetting */}
-              <div className="flex flex-wrap items-center gap-2.5 shrink-0 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
+              {/* Product Admin controls for scheduling a project launch */}
+              {currentRole === 'PRODUCT_ADMIN' && <div className="flex flex-wrap items-center gap-2.5 shrink-0 bg-slate-900/80 p-2.5 rounded-xl border border-slate-800">
                 <button
                   onClick={() => handleScheduleLaunch('2026-09-11T14:00:00+07:00')}
                   disabled={isSchedulingLaunch}
@@ -719,7 +723,7 @@ export function InventoryMatrix({
                   <span>Chuẩn Đề Bài: 14h00 11/09</span>
                 </button>
 
-                <button
+                {currentRole === 'PRODUCT_ADMIN' && <button
                   onClick={() => handleScheduleLaunch(new Date().toISOString())}
                   disabled={isSchedulingLaunch}
                   className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase flex items-center space-x-1.5 shadow-lg shadow-emerald-600/30 transition"
@@ -727,8 +731,8 @@ export function InventoryMatrix({
                 >
                   <Play className="w-3.5 h-3.5 text-amber-300 fill-amber-300" />
                   <span>{isSchedulingLaunch ? 'Đang kích hoạt...' : 'Mô Phỏng: Mở Bán Ngay'}</span>
-                </button>
-              </div>
+                </button>}
+              </div>}
             </div>
           </div>
 
@@ -900,7 +904,7 @@ export function InventoryMatrix({
                             </button>
                             )}
 
-                            {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && isPendingDeposit && (
+                            {currentRole === 'SALES_ADMIN' && isPendingDeposit && (
                               <button
                                 onClick={() => handleApproveBooking(b.id)}
                                 disabled={isApprovingBooking === b.id}
@@ -960,10 +964,10 @@ export function InventoryMatrix({
                 <div className="px-4 py-2 rounded-xl bg-slate-900 border border-amber-500/50 text-center shadow-lg">
                   <div className="text-[10px] text-amber-400 font-semibold uppercase">Đếm Ngược Ra Hàng</div>
                   <div className="text-sm font-mono font-black text-amber-300">
-                    {getLaunchCountdown(projectLaunchTime)}
+                    {getLaunchCountdown(projectLaunchTime!)}
                   </div>
                 </div>
-                <button
+                {currentRole === 'PRODUCT_ADMIN' && <button
                   onClick={() => handleScheduleLaunch(new Date().toISOString())}
                   disabled={isSchedulingLaunch}
                   className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase shadow-md flex items-center space-x-1.5 transition"
@@ -971,7 +975,7 @@ export function InventoryMatrix({
                 >
                   <Zap className="w-3.5 h-3.5 text-amber-300" />
                   <span>{isSchedulingLaunch ? 'Đang kích hoạt...' : 'Mô Phỏng: Mở Bán Ngay'}</span>
-                </button>
+                </button>}
               </div>
             </div>
           )}
@@ -1033,14 +1037,14 @@ export function InventoryMatrix({
                     Booking <strong className="text-amber-300">#{String(pendingBookingInProject.sttBooking).padStart(3, '0')} - {pendingBookingInProject.maLuotBooking}</strong> của khách hàng <strong className="text-white">{pendingBookingInProject.customerName}</strong> ({pendingBookingInProject.customerPhone}).
                   </p>
                   <p className="text-[11px] text-amber-400/90 font-medium mt-0.5">
-                    {currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER'
+                    {currentRole === 'SALES_ADMIN'
                       ? 'Sales Admin nhấn duyệt để tạo lượt booking kế tiếp nối tiếp theo thứ tự.'
                       : 'Đang chờ Sales Admin xác nhận nhận tiền cọc để tạo lượt booking kế tiếp.'}
                   </p>
                 </div>
               </div>
 
-              {(currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER') && (
+              {currentRole === 'SALES_ADMIN' && (
                 <button
                   onClick={() => handleApproveBooking(pendingBookingInProject.id)}
                   disabled={isApprovingBooking === pendingBookingInProject.id}
@@ -1210,7 +1214,7 @@ export function InventoryMatrix({
                                   let btnText = '📝 Nhập TT Hợp Đồng';
                                   let btnBg = 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white';
                                   if (st === 'PENDING_REVIEW') {
-                                    btnText = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? '🔎 Duyệt Hợp Đồng' : '⏳ Chờ Admin Duyệt';
+                                    btnText = currentRole === 'SALES_ADMIN' ? '🔎 Duyệt Hợp Đồng' : '👁 Xem Hợp Đồng';
                                     btnBg = 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black animate-pulse';
                                   } else if (st === 'CHANGE_REQUESTED' || st === 'CHANGES_REQUESTED') {
                                     btnText = '⚠️ Yêu Cầu Nhập Lại';
@@ -1325,7 +1329,7 @@ export function InventoryMatrix({
                             let btnText = '📝 Nhập TT HĐ';
                             let btnBg = 'bg-purple-600 hover:bg-purple-500 text-white';
                             if (st === 'PENDING_REVIEW') {
-                              btnText = currentRole === 'SALES_ADMIN' || currentRole === 'MANAGER' ? '🔎 Duyệt HĐ' : '⏳ Chờ Admin Duyệt';
+                              btnText = currentRole === 'SALES_ADMIN' ? '🔎 Duyệt HĐ' : '👁 Xem HĐ';
                               btnBg = 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black animate-pulse';
                             } else if (st === 'CHANGE_REQUESTED' || st === 'CHANGES_REQUESTED') {
                               btnText = '⚠️ Nhập Lại HĐ';

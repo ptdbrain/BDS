@@ -4,6 +4,7 @@ import { createAuditLog } from '@/lib/audit';
 import { resolveEmployeeId } from '@/lib/employeeHelper';
 import { ensureContractExists } from '@/lib/contractHelper';
 import { getAuthorizedFinancialFields, sanitizeContractForRole } from '@/lib/contractFinancialPolicy';
+import { isManagerReadOnly } from '@/lib/rolePolicy';
 
 export async function GET(
   request: Request,
@@ -41,6 +42,9 @@ export async function PATCH(
   try {
     const body = await request.json();
     const actorRole = (body.actorRole || request.headers.get('x-user-role') || 'SALES').toUpperCase();
+    if (isManagerReadOnly(actorRole)) {
+      return NextResponse.json({ error: 'Giám đốc chỉ có quyền xem, không được sửa hợp đồng.' }, { status: 403 });
+    }
     let financialFields: Record<string, unknown>;
     try {
       financialFields = getAuthorizedFinancialFields(actorRole, body);
