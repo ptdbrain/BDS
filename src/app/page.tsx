@@ -461,18 +461,19 @@ export default function Home() {
         activeProjectName={currentProject?.name}
       />
 
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
-          activeTab={activeTab}
-          onTabChange={handleTabChange}
-          currentRole={currentRole}
-          activeLocksCount={activeLocksCount}
-          pendingVerificationsCount={pendingVerificationsCount}
-          pendingContractsCount={pendingContractsCount}
-          pendingBookingsCount={pendingBookingsCount}
-        />
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex-1 flex min-h-0 overflow-hidden">
+          <Sidebar
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            currentRole={currentRole}
+            activeLocksCount={activeLocksCount}
+            pendingVerificationsCount={pendingVerificationsCount}
+            pendingContractsCount={pendingContractsCount}
+            pendingBookingsCount={pendingBookingsCount}
+          />
 
-        <main className="flex-1 p-6 overflow-y-auto max-w-7xl mx-auto w-full">
+          <main className="flex-1 min-w-0 p-6 overflow-y-auto max-w-7xl mx-auto w-full">
           {activeTab === 'inventory' && (
             <InventoryMatrix
               products={products}
@@ -563,7 +564,8 @@ export default function Home() {
               currentUser={currentUser}
             />
           )}
-        </main>
+          </main>
+        </div>
 
         {/* Global Enterprise Footer */}
         <footer className="mt-10 py-5 border-t border-slate-800/80 text-center text-xs text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3 px-2">

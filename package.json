@@ -7,7 +7,7 @@
     "build": "prisma generate && prisma db push && node prisma/seed.mjs && next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "npm run test:role-booking && node --experimental-strip-types --test scripts/tests/contract-financial-policy.test.mjs scripts/tests/booking-approval.test.mjs",
+    "test": "npm run test:role-booking && node --experimental-strip-types --test scripts/tests/contract-financial-policy.test.mjs scripts/tests/booking-approval.test.mjs scripts/tests/ui-layout.test.mjs",
     "test:role-booking": "node --experimental-strip-types --test scripts/tests/role-booking-status.test.mjs",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
